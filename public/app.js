@@ -1,4 +1,4 @@
-import { diffBriefs, escapeHtml, modeLabel, renderBrief, renderDiff, renderPlain, runSummary } from './render.js';
+import { diffBriefs, modeLabel, renderBrief, renderDiff, renderPlain, runSummary } from './render.js';
 
 const $ = (s) => document.querySelector(s);
 const form = $('#stage-form');
@@ -23,6 +23,8 @@ const plainContent = $('#plain-content');
 const plainView = $('#plain-view');
 const briefView = $('#brief-view');
 const featureNode = $('#feature-list');
+const formDetails = $('#form-details');
+const paletteStyle = $('#palette-style');
 
 const FEATURES = ['natural light', 'open kitchen', 'front porch', 'home office', 'garden', 'fireplace', 'hardwood floors', 'walk in closet', 'updated bath', 'big windows', 'high ceilings', 'patio', 'workshop', 'reading nook'];
 let catalogue = { presets: [], lenses: [], features: FEATURES };
@@ -37,6 +39,20 @@ let currentLens = null;
 let otherLens = null;
 let plainEvent = null;
 
+const localPresets = [
+  { label: 'Design forward', city: 'Nashville', neighbourhood: 'East Nashville', hint: 'Warm craft and local finds', lens: { label: 'Design forward', anchors: ['Herman Miller', 'Kinfolk', 'Khruangbin'] }, room: ['IKEA', 'Pottery Barn', 'West Elm', 'CB2'] },
+  { label: 'Classic comfort', city: 'Nashville', neighbourhood: '12 South', hint: 'Familiar forms, fresh detail', lens: { label: 'Classic comfort', anchors: ['Ralph Lauren', 'House Beautiful', 'Norah Jones'] }, room: ['IKEA', 'Pottery Barn', 'West Elm', 'CB2'] },
+  { label: 'Design forward', city: 'Chicago', neighbourhood: 'Hyde Park', hint: 'Collected, bookish character', lens: { label: 'Design forward', anchors: ['Herman Miller', 'Kinfolk', 'Khruangbin'] }, room: ['IKEA', 'Pottery Barn', 'West Elm', 'CB2'] },
+  { label: 'Classic comfort', city: 'Chicago', neighbourhood: 'Wicker Park', hint: 'Soft layers with city spirit', lens: { label: 'Classic comfort', anchors: ['Ralph Lauren', 'House Beautiful', 'Norah Jones'] }, room: ['IKEA', 'Pottery Barn', 'West Elm', 'CB2'] },
+  { label: 'Design forward', city: 'Halifax', neighbourhood: 'North End', hint: 'A calm coastal palette', lens: { label: 'Design forward', anchors: ['Studio K', 'Paper Moon', 'Harbor Radio'] }, room: ['IKEA', 'Pottery Barn', 'West Elm', 'CB2'] },
+  { label: 'Classic comfort', city: 'Halifax', neighbourhood: '', hint: 'Easy pieces, grounded feel', lens: { label: 'Classic comfort', anchors: ['Ralph Lauren', 'House Beautiful', 'Norah Jones'] }, room: ['IKEA', 'Pottery Barn', 'West Elm', 'CB2'] },
+];
+const runSteps = ['Plan', 'Buyer', 'Place', 'Sections', 'Room', 'Audit', 'Write'];
+
+const palette = new URLSearchParams(location.search).get('palette');
+if (['linen', 'sage', 'harbour', 'walnut'].includes(palette)) { paletteStyle.href = `/palettes/${palette}.css`; paletteStyle.disabled = false; }
+if (matchMedia('(max-width: 899px)').matches) formDetails.open = false;
+
 function markCustom() { if (selectedPreset) { selectedPreset = null; drawPresets(); } }
 function textNode(tag, text, cls) { const node = document.createElement(tag); node.textContent = text; if (cls) node.className = cls; return node; }
 function drawRooms() {
@@ -49,8 +65,13 @@ function drawRooms() {
 }
 function drawPresets() {
   presetsNode.replaceChildren();
-  catalogue.presets.forEach((preset) => {
-    const button = document.createElement('button'); button.type = 'button'; button.className = 'chip'; button.textContent = preset.label; button.setAttribute('aria-pressed', String(selectedPreset === preset.id));
+  (catalogue.presets.length ? catalogue.presets : localPresets).forEach((preset) => {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'preset-card'; button.setAttribute('aria-pressed', String(selectedPreset === preset.id));
+    const cityLine = textNode('span', preset.city || '', 'preset-city');
+    const neighbourhoodLine = textNode('span', preset.neighbourhood || 'City wide', 'preset-neighbourhood');
+    const lens = textNode('strong', preset.lens?.label || preset.label || 'A point of view', 'preset-lens');
+    const hint = textNode('span', preset.hint || `A brief for ${preset.city || 'your city'}`, 'preset-hint');
+    button.append(cityLine, neighbourhoodLine, lens, hint);
     button.addEventListener('click', () => applyPreset(preset)); presetsNode.append(button);
   });
 }
@@ -62,7 +83,7 @@ function drawLenses() {
   });
 }
 function applyPreset(preset) {
-  selectedPreset = preset.id; city.value = preset.city || ''; neighbourhood.value = preset.neighbourhood || '';
+  selectedPreset = preset.id || null; city.value = preset.city || ''; neighbourhood.value = preset.neighbourhood || '';
   currentLens = preset.lens || null; anchors.forEach((input, i) => { input.value = currentLens?.anchors?.[i] || ''; });
   room = [...(preset.room || [])].slice(0, 6); drawRooms(); drawLenses(); drawPresets();
   const selected = new Set(preset.features || []); featureNode.querySelectorAll('input').forEach((input) => { input.checked = selected.has(input.value); });
@@ -78,6 +99,8 @@ function drawFeatures() {
 async function loadPresets() {
   try { const response = await fetch('/api/presets'); if (!response.ok) throw new Error(); catalogue = { ...catalogue, ...await response.json() }; }
   catch { catalogue = { ...catalogue, presets: [] }; }
+  if (!catalogue.presets.length) catalogue.presets = localPresets;
+  if (!catalogue.lenses.length) catalogue.lenses = [...new Map(localPresets.map((preset) => [preset.lens.label, preset.lens])).values()];
   drawPresets(); drawLenses(); drawFeatures();
 }
 function collectRequest() {
@@ -91,30 +114,39 @@ function resetRun() {
   briefContent.innerHTML = '<p class="empty-note">Building the brief…</p>'; modeBadge.hidden = true; diffBox.hidden = true; diffBox.replaceChildren();
 }
 function logEvent(event) {
-  const t = event.t;
-  let message = '';
-  if (t === 'call') message = `Call ${event.n}: ${event.what || event.path}${event.cached ? ' from cache' : ''}`;
-  if (t === 'resolved') message = `${event.kind}: ${event.name} as ${event.as}`;
-  if (t === 'relax') message = `${event.why || `Using ${event.to} for better local data`}. This brief uses ${event.to}.`;
-  if (t === 'fallback') message = `Writing fallback: ${event.why}`;
-  if (!message) return;
-  const line = textNode('p', message, `log-line${t === 'relax' ? ' relax' : ''}`); runLines.append(line);
-  if (t === 'relax') runSummaryNode.textContent = `${runSummary(activeEvents)} · ${message}`;
+  if (event.t === 'done') return;
+  const completed = new Set();
+  if (activeEvents.some((e) => e.t === 'plan')) completed.add(0);
+  if (activeEvents.some((e) => e.t === 'resolved' && e.kind === 'anchor')) completed.add(1);
+  if (activeEvents.some((e) => e.t === 'resolved' && e.kind === 'scope')) completed.add(2);
+  if (activeEvents.filter((e) => e.t === 'section').length >= 3) completed.add(3);
+  if (activeEvents.some((e) => e.t === 'resolved' && e.kind === 'room')) completed.add(4);
+  if (activeEvents.some((e) => e.t === 'audit')) completed.add(5);
+  if (activeEvents.some((e) => e.t === 'brief')) completed.add(6);
+  const activeIndex = Math.min(6, completed.size ? Math.max(...completed) + 1 : 0);
+  runLines.replaceChildren();
+  const list = document.createElement('ol'); list.className = 'timeline';
+  runSteps.forEach((label, index) => {
+    const item = document.createElement('li');
+    if (completed.has(index)) item.classList.add('done'); else if (index === activeIndex) item.classList.add('active');
+    const dot = document.createElement('span'); dot.className = 'step-dot';
+    item.append(dot, document.createTextNode(label)); list.append(item);
+  });
+  runLines.append(list);
 }
 function handleEvent(event) {
   activeEvents.push(event); logEvent(event);
   if (event.t === 'run') { briefId = event.id || briefId; modeBadge.textContent = modeLabel(event); modeBadge.hidden = !modeBadge.textContent; }
   if (event.t === 'error') { errorBox.textContent = event.text || 'The brief could not be made. Try a preset.'; errorBox.hidden = false; }
-  if (event.t === 'brief' || event.t === 'section' || event.t === 'audit') briefContent.innerHTML = renderBrief(activeEvents);
+  if (event.t === 'brief' || event.t === 'section' || event.t === 'audit' || event.t === 'relax') briefContent.innerHTML = renderBrief(activeEvents, otherLens?.label || '', baselineEvents || []);
   if (event.t === 'plain') { plainEvent = event; plainContent.innerHTML = renderPlain(event, activeEvents); }
   if (event.t === 'done') {
-    briefContent.innerHTML = renderBrief(activeEvents); runSummaryNode.textContent = runSummary(activeEvents);
-    const relax = activeEvents.find((e) => e.t === 'relax');
-    if (relax) runSummaryNode.textContent += ` · ${relax.why || `This brief uses ${relax.to}`}`;
+    const completedBrief = [...activeEvents].reverse().find((e) => e.t === 'brief');
+    otherLens = catalogue.lenses.find((lens) => lens.label !== (completedBrief?.lens || requestState?.lens?.label)) || null;
+    briefContent.innerHTML = renderBrief(activeEvents, otherLens?.label || '', baselineEvents || []); runSummaryNode.textContent = runSummary(activeEvents);
     runLog.open = false;
     shareButton.hidden = !briefId; printButton.hidden = false;
-    otherLens = catalogue.lenses.find((lens) => lens.label !== requestState?.lens?.label) || null;
-    lensToggle.hidden = !otherLens || !briefId;
+    lensToggle.hidden = true;
     if (otherLens) lensToggle.textContent = `See it for ${otherLens.label}`;
   }
 }
@@ -159,15 +191,20 @@ shareButton.addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(url); shareButton.textContent = 'Link copied'; } catch { shareButton.textContent = 'Copy unavailable'; }
 });
 printButton.addEventListener('click', () => window.print());
-lensToggle.addEventListener('click', async () => {
+async function flipLens() {
   if (!briefId || !otherLens || busy) return;
   baselineEvents = activeEvents.slice(); const originalRequest = requestState;
   const flipped = { ...originalRequest, lens: otherLens, ...(selectedPreset ? { preset: selectedPreset } : {}) };
   requestState = flipped; activeEvents = []; runLines.replaceChildren(); runSummaryNode.textContent = 'Run log'; runLog.open = true;
   await postRun('/api/stage', flipped, { reset: false });
-  if (activeEvents.some((event) => event.t === 'done') && baselineEvents) { diffBox.innerHTML = renderDiff(diffBriefs(baselineEvents, activeEvents)); diffBox.hidden = false; }
-  requestState = originalRequest; currentLens = originalRequest.lens; otherLens = flipped.lens; lensToggle.textContent = `See it for ${otherLens.label}`;
-});
+  if (activeEvents.some((event) => event.t === 'done') && baselineEvents) {
+    diffBox.innerHTML = renderDiff(diffBriefs(baselineEvents, activeEvents)); diffBox.hidden = false;
+    requestState = flipped; currentLens = flipped.lens; otherLens = originalRequest.lens;
+    briefContent.innerHTML = renderBrief(activeEvents, otherLens.label, baselineEvents || []);
+  } else requestState = originalRequest;
+}
+lensToggle.addEventListener('click', flipLens);
+briefContent.addEventListener('click', (event) => { if (event.target.closest('[data-lens-switch]')) flipLens(); });
 document.querySelectorAll('[data-tab]').forEach((button) => button.addEventListener('click', async () => {
   const plain = button.dataset.tab === 'plain';
   document.querySelectorAll('[data-tab]').forEach((tab) => tab.classList.toggle('active', tab === button));
@@ -188,7 +225,24 @@ async function loadShared(id) {
   } catch { errorBox.textContent = 'This brief could not be found.'; errorBox.hidden = false; }
 }
 async function loadDev() {
-  try { const response = await fetch('/dev/sample-run.ndjson'); if (!response.ok) throw new Error(); await readNdjson(response, handleEvent); }
+  try {
+    const params = new URLSearchParams(location.search);
+    const file = params.has('running') ? 'sample-running.ndjson' : 'sample-run.ndjson';
+    if (params.has('running')) runLog.open = true;
+    const response = await fetch(`/dev/${file}`); if (!response.ok) throw new Error(); await readNdjson(response, handleEvent);
+    if (params.has('flip') && activeEvents.some((event) => event.t === 'done')) {
+      baselineEvents = activeEvents.slice();
+      const flipResponse = await fetch('/dev/sample-flip.ndjson');
+      if (flipResponse.ok) {
+        const flipText = await flipResponse.text();
+        const flippedEvents = flipText.trim().split('\n').map((line) => JSON.parse(line));
+        activeEvents = flippedEvents;
+        otherLens = { label: 'Design forward' };
+        briefContent.innerHTML = renderBrief(activeEvents, otherLens.label, baselineEvents);
+        diffBox.innerHTML = renderDiff(diffBriefs(baselineEvents, activeEvents)); diffBox.hidden = false;
+      }
+    }
+  }
   catch { errorBox.textContent = 'The sample brief could not be loaded.'; errorBox.hidden = false; }
 }
 await loadPresets();

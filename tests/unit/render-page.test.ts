@@ -15,8 +15,8 @@ describe('Listing Lens render functions', () => {
       ] })),
       { t: 'brief', paragraph: 'A place to enjoy.', written_by: 'template', scope: 'Halifax' },
     ]);
-    expect(html).toContain('>Keep</span>');
-    expect(html).toContain('>Not in Qloo</span>');
+    expect(html).toContain('Keep</span>');
+    expect(html).toContain('Not in Qloo</span>');
     expect(html).toContain('0.907');
     expect(html).toContain('Brands to show');
     expect(html).toContain('Coffee table books');
@@ -41,8 +41,44 @@ describe('Listing Lens render functions', () => {
     const diff = diffBriefs(a, b);
     expect(diff.sections[0]).toEqual({ key: 'brands', added: ['D'], dropped: ['B'], moved: [{ name: 'C', from: 3, to: 1, delta: 2 }, { name: 'A', from: 1, to: 2, delta: -1 }] });
     expect(diff.audit).toEqual([{ name: 'Desk', from: 'keep', to: 'swap' }]);
-    expect(renderDiff(diff)).toContain('↑ 2');
+    expect(renderDiff(diff)).toContain('Up 2 C');
     expect(renderDiff(diff)).toContain('Keep to Swap');
+  });
+
+  it('renders the scope, relaxed neighbourhood, verdict marker, and changed verdict history', () => {
+    const html = renderBrief([
+      { t: 'run', mode: 'replay' },
+      { t: 'section', key: 'brands', items: [{ name: 'Top pick', affinity: 0.92 }] },
+      { t: 'relax', from: 'East Nashville', to: 'Nashville', why: 'Local data is thin' },
+      { t: 'audit', rows: [{ name: 'Chair', affinity: 0.88, verdict: 'swap' }] },
+      { t: 'brief', scope: 'Nashville', lens: 'Classic comfort' },
+    ], 'Design forward', [{ t: 'audit', rows: [{ name: 'Chair', verdict: 'keep' }] }]);
+    expect(html).toContain('Nashville');
+    expect(html).toContain('from East Nashville');
+    expect(html).toContain('data-lens-switch');
+    expect(html).toContain('Was Keep');
+    expect(html).toContain('score-marker');
+    expect(html).toContain('Using Nashville for this brief');
+  });
+
+  it('renders lazy thumbnails with a neutral fallback when no image exists', () => {
+    const html = renderBrief([{ t: 'section', key: 'brands', items: [
+      { name: 'A', affinity: 0.9, image: 'https://images.example.invalid/a.jpg' },
+      { name: 'B', affinity: 0.8 }, { name: 'C', affinity: 0.7 },
+    ] }]);
+    expect(html).toContain('loading="lazy"');
+    expect(html).toContain('referrerpolicy="no-referrer"');
+    expect(html).toContain('result-thumb-empty');
+  });
+
+  it('provides synthetic flip and running development event sets', async () => {
+    const fs = await import('node:fs/promises');
+    const flip = (await fs.readFile(new URL('../../public/dev/sample-flip.ndjson', import.meta.url), 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
+    const running = (await fs.readFile(new URL('../../public/dev/sample-running.ndjson', import.meta.url), 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
+    expect(flip.find((event) => event.t === 'brief').lens).toBe('Classic comfort');
+    expect(flip.at(-1).t).toBe('done');
+    expect(running.some((event) => event.t === 'call')).toBe(true);
+    expect(running.some((event) => event.t === 'done')).toBe(false);
   });
 
   it('labels all run modes and summarizes calls and cache use', () => {

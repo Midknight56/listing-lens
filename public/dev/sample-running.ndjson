@@ -1,0 +1,7 @@
+{"t":"run","id":"brief-test-running","mode":"replay","recorded_at":"2026-10-25"}
+{"t":"plan","budget":16,"steps":["resolve buyer","place and brands","books, playlist, places","room","audit","write"]}
+{"t":"call","n":1,"path":"/search","what":"Studio K","cached":false,"ms":18,"count":1}
+{"t":"resolved","kind":"anchor","name":"Studio K","as":"Studio K (brand)","id":"ent-test-0201"}
+{"t":"call","n":2,"path":"/search","what":"Paper Moon","cached":false,"ms":16,"count":1}
+{"t":"resolved","kind":"anchor","name":"Paper Moon","as":"Paper Moon (book)","id":"ent-test-0202"}
+{"t":"call","n":3,"path":"/search","what":"Harbor Radio","cached":false,"ms":14,"count":1}

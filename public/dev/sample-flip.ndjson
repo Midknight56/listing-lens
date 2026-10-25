@@ -1,0 +1,23 @@
+{"t":"run","id":"brief-test-0002","mode":"replay","recorded_at":"2026-10-25"}
+{"t":"plan","budget":16,"steps":["resolve buyer","place and brands","books, playlist, places","room","audit","write"]}
+{"t":"call","n":1,"path":"/search","what":"Ralph Lauren","cached":false,"ms":18,"count":1}
+{"t":"resolved","kind":"anchor","name":"Ralph Lauren","as":"Ralph Lauren (brand)","id":"ent-test-0101"}
+{"t":"call","n":2,"path":"/search","what":"House Beautiful","cached":false,"ms":16,"count":1}
+{"t":"resolved","kind":"anchor","name":"House Beautiful","as":"House Beautiful (book)","id":"ent-test-0102"}
+{"t":"call","n":3,"path":"/search","what":"Norah Jones","cached":false,"ms":14,"count":1}
+{"t":"resolved","kind":"anchor","name":"Norah Jones","as":"Norah Jones (artist)","id":"ent-test-0103"}
+{"t":"call","n":4,"path":"/v2/insights","what":"Halifax place and brands","cached":false,"ms":22,"count":5}
+{"t":"call","n":5,"path":"/v2/insights","what":"coffee table books","cached":false,"ms":19,"count":3}
+{"t":"call","n":6,"path":"/v2/insights","what":"open house playlist","cached":false,"ms":17,"count":3}
+{"t":"call","n":7,"path":"/v2/insights","what":"local favourites","cached":false,"ms":17,"count":3}
+{"t":"call","n":8,"path":"/search","what":"brands already in the room","cached":false,"ms":21,"count":4}
+{"t":"relax","from":"North End","to":"Halifax","why":"Local data is thin for North End"}
+{"t":"resolved","kind":"scope","name":"Halifax","as":"Halifax, Nova Scotia","id":"ent-test-0104"}
+{"t":"section","key":"brands","items":[{"id":"ent-test-0110","name":"Northline Studio","type":"brand","affinity":0.887,"why":"Because they love House Beautiful (61%)"},{"id":"ent-test-0111","name":"Field House","type":"brand","affinity":0.921,"why":"Because they love Ralph Lauren (58%)"},{"id":"ent-test-0112","name":"Maple Works","type":"brand","affinity":0.842,"why":"Because they love Norah Jones (49%)"}]}
+{"t":"section","key":"books","items":[{"id":"ent-test-0120","name":"Useful Spaces","type":"book","affinity":0.85,"why":"Because they love House Beautiful (61%)"},{"id":"ent-test-0121","name":"Quiet Rooms","type":"book","affinity":0.83,"why":"Because they love Ralph Lauren (53%)"},{"id":"ent-test-0122","name":"Coast and Color","type":"book","affinity":0.79,"why":"Because they love Norah Jones (48%)"}]}
+{"t":"section","key":"playlist","items":[{"id":"ent-test-0130","name":"Sunday Static","type":"artist","affinity":0.87,"why":"Because they love Norah Jones (64%)"},{"id":"ent-test-0131","name":"Soft Weather","type":"artist","affinity":0.85,"why":"Because they love House Beautiful (55%)"},{"id":"ent-test-0132","name":"Small Hours","type":"artist","affinity":0.81,"why":"Because they love Ralph Lauren (48%)"}]}
+{"t":"section","key":"places","items":[{"id":"ent-test-0140","name":"Cedar Market","type":"place","affinity":0.87,"why":"Popular with people in Halifax who share this taste"},{"id":"ent-test-0141","name":"Harbor Coffee","type":"place","affinity":0.84,"why":"Popular with people in Halifax who share this taste"},{"id":"ent-test-0142","name":"The Reading Room","type":"place","affinity":0.8,"why":"Popular with people in Halifax who share this taste"}]}
+{"t":"audit","rows":[{"name":"Northline Studio","id":"ent-test-0110","affinity":0.887,"verdict":"swap","swap":{"id":"ent-test-0111","name":"Field House","affinity":0.921}},{"name":"Maple Works","id":"ent-test-0112","affinity":0.842,"verdict":"cut","swap":{"id":"ent-test-0111","name":"Field House","affinity":0.921}},{"name":"Old Harbor Co","id":"ent-test-0113","affinity":0.761,"verdict":"cut","swap":{"id":"ent-test-0111","name":"Field House","affinity":0.921}},{"name":"Unknown Label","verdict":"unknown"}]}
+{"t":"brief","intro":"Comfortable classics settle naturally into this coastal home.","paragraph":"Natural light and hardwood floors give this Halifax home a bright, grounded feel. Nearby independent shops and a welcoming coffee stop add local character.","written_by":"template","scope":"Halifax, Nova Scotia","lens":"Classic comfort"}
+{"t":"usage","qloo_upstream":8,"qloo_cached":2,"neurons":0}
+{"t":"done"}
