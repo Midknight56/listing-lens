@@ -15,5 +15,8 @@
   ],
   "durable_objects": { "bindings": [{ "name": "COUNTERS", "class_name": "DailyCounter" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DailyCounter"] }],
-  "observability": { "enabled": false }
+  "observability": { "enabled": false },
+  // One public address only; per version preview links stay off.
+  "workers_dev": true,
+  "preview_urls": false
 }
