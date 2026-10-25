@@ -6,6 +6,7 @@ import {
   type StageRequest,
 } from "../../src/agent/run";
 import type { TextReply } from "../../src/agent/model";
+import { unknownName } from "../../src/agent/run";
 
 const entity = (id: string, name: string, type: string, detail?: string) => ({
   id,
@@ -96,6 +97,17 @@ describe("writer facts", () => {
   it("tells the writer the places are not part of the home", () => {
     expect(PARAGRAPH_PROMPT).toContain("not part of the home");
     expect(PARAGRAPH_PROMPT).toContain("who the home suits");
+    // Live drafts were caught for these on 25 Oct; the prompt steers away from them before the guards have to.
+    expect(PARAGRAPH_PROMPT).toContain("ideal for or perfect for");
+    expect(PARAGRAPH_PROMPT).toContain("nationality");
+  });
+});
+
+describe("names check", () => {
+  it("accepts a part of a joined word from a note", () => {
+    const facts = ["New Sky Restaurant", "Chinese bistro offering Cantonese-style dishes"];
+    expect(unknownName("Nearby, New Sky Restaurant serves Cantonese dishes.", facts)).toBeNull();
+    expect(unknownName("Nearby, New Sky Restaurant serves Sichuan dishes.", facts)).toBe("Sichuan");
   });
 });
 

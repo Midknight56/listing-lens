@@ -29,9 +29,13 @@ export function namesAreKnown(text: string, facts: string[]): boolean {
 
 /** The first capitalised word that is not in the facts, or null when every name is known. */
 export function unknownName(text: string, facts: string[]): string | null {
+  // A joined word in a note ("Cantonese-style") also vouches for its parts, which a draft may use alone.
   const known = new Set(
     facts.flatMap((fact) =>
-      words(fact).map((word) => word.toLocaleLowerCase()),
+      words(fact).flatMap((word) => {
+        const lower = word.toLocaleLowerCase();
+        return [lower, ...lower.split(/[-'’]/)];
+      }),
     ),
   );
   const allowed = new Set([
@@ -120,7 +124,8 @@ export const INTRO_PROMPT = [
   "(real places in the area, not part of the home).",
   "Write ONE sentence of at most 25 words about the home and its area. Use only the facts.",
   "Do not name any place, brand or city that is not in the facts.",
-  "Do not describe people, households, ages, or who the home suits. Plain text, no quotes.",
+  "Do not describe people, households, ages, or who the home suits.",
+  "Use no word for a nationality, ethnicity, language or religion. Plain text, no quotes.",
 ].join(" ");
 export const PARAGRAPH_PROMPT = [
   "You write a listing paragraph of 60 to 80 words.",
@@ -130,6 +135,8 @@ export const PARAGRAPH_PROMPT = [
   "Pick three of them and give each a few words drawn from its note.",
   "Do not name any other place, brand or city.",
   "Do not describe people, households, ages, or who the home suits. No prices, schools or safety claims.",
+  "Never write the phrases ideal for or perfect for.",
+  "Use no word for a nationality, ethnicity, language or religion unless that exact word is in a note.",
   "One paragraph of plain prose.",
 ].join(" ");
 const NOTE_CHARS = 120;
