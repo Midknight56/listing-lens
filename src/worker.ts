@@ -64,7 +64,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     const cache = new D1Cache(env.DB)
-    const qloo = new QlooClient(env.QLOO_KEY ?? '', fetch, cache, async () => {
+    const qloo = new QlooClient(env.QLOO_KEY ?? '', (input, init) => fetch(input, init), cache, async () => {
       const visitor = request.headers.get('CF-Connecting-IP') ?? 'visitor'
       return (await new VisitorCaps({
         take: async (key, cap, ttl) => {
