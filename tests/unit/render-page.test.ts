@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { diffBriefs, escapeHtml, modeLabel, renderBrief, renderDiff, renderPlain, runSummary } from '../../public/render.js';
 
-describe('Listing Lens render functions', () => {
+describe('Staging Brief render functions', () => {
   it('escapes user supplied text', () => {
     expect(escapeHtml('<script title="x">&\'')).toBe('&lt;script title=&quot;x&quot;&gt;&amp;&#39;');
     expect(renderBrief([{ t: 'brief', intro: '<img src=x>', paragraph: '<b>text</b>', written_by: 'template' }])).not.toContain('<img');

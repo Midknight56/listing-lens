@@ -162,8 +162,8 @@ export default {
     if (url.pathname === "/mcp") {
       const server = new McpServer({
         info: {
-          name: "listing-lens",
-          title: "Listing Lens",
+          name: "staging-brief",
+          title: "Staging Brief",
           version: "1.0.0",
           websiteUrl: "https://listing-lens.midknight-labs.workers.dev",
         },

@@ -1,6 +1,6 @@
-# Listing Lens
+# Staging Brief
 
-Listing Lens writes a staging brief for a home for sale. You give it the place, three things a likely buyer loves, the
+Staging Brief writes a short brief for staging a home for sale. You give it the place, three things a likely buyer loves, the
 furniture brands already in the room and what the home has. It asks Qloo's taste graph what people with those loves
 also like near that home, then comes back with a room audit, a short shopping and mood list, and a listing paragraph.
 
@@ -27,7 +27,7 @@ Try it: https://listing-lens.midknight-labs.workers.dev
 
 ## How it uses Qloo
 
-| Qloo call | What Listing Lens does with it |
+| Qloo call | What Staging Brief does with it |
 | --- | --- |
 | `GET /search` | Turns each love into an entity, and each room brand into a brand (`types=urn:entity:brand`). |
 | `GET /v2/insights` | Walks the graph from the loves to brands, books, artists and places, with `signal.location.query` for the place and `filter.location.query` to keep places local. |
@@ -39,7 +39,7 @@ The same calls are an MCP server at `/mcp` (Streamable HTTP) with three tools: `
 
 ## Fair housing
 
-A listing must not say who should live in a home. Listing Lens keeps people out of every step.
+A listing must not say who should live in a home. Staging Brief keeps people out of every step.
 
 * The buyer lens is only things people love: brands, books, music. It never sends an age, a gender or a household to
   Qloo, and the code has no field for one.

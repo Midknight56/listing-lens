@@ -1,4 +1,4 @@
-// Daily limits for Listing Lens.
+// Daily limits for Staging Brief.
 export const DAILY_QLOO_CALLS = 500; // 500 x 27 days = 13,500, or 27% of the 50,000 monthly shared quota.
 export const DAILY_QLOO_CALLS_PER_VISITOR = 48; // 3 fresh runs x 16 calls per run.
 export const DAILY_FRESH_RUNS_PER_VISITOR = 3; // 3 fresh visitor runs each day.

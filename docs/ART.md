@@ -1,4 +1,4 @@
-# Listing Lens look
+# Staging Brief look
 
 ## Palette: sage
 

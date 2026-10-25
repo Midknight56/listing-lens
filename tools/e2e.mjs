@@ -1,4 +1,4 @@
-// Listing Lens end to end play through. Run through the shared browser lock.
+// Staging Brief end to end play through. Run through the shared browser lock.
 //   node tools/e2e.mjs [base url]
 import { execSync } from 'node:child_process'
 import { mkdirSync, readFileSync } from 'node:fs'
