@@ -125,4 +125,19 @@ describe("writer run", () => {
     expect(writing.map((event) => (event as { why: string }).why)).toEqual(["cut short", "cut short"]);
     expect(events.find((event) => event.t === "brief")).toMatchObject({ written_by: "template" });
   });
+  it("names the caught word in the run log", async () => {
+    const { writing } = await stage((prompt) => ({
+      content:
+        prompt === PARAGRAPH_PROMPT
+          ? "The home has natural light. It is perfect for families near Wrigley Room."
+          : "A bright home near Wrigley Room in Test City.",
+      prompt_tokens: 1,
+      completion_tokens: 1,
+      finish: "stop",
+    }));
+    expect(writing).toEqual([
+      { t: "fallback", what: "intro", why: "names check", detail: "Wrigley" },
+      { t: "fallback", what: "paragraph", why: "fair housing scan", detail: expect.stringContaining("famil") },
+    ]);
+  });
 });

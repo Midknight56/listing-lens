@@ -24,6 +24,11 @@ export interface RunDeps {
 }
 
 export function namesAreKnown(text: string, facts: string[]): boolean {
+  return unknownName(text, facts) === null;
+}
+
+/** The first capitalised word that is not in the facts, or null when every name is known. */
+export function unknownName(text: string, facts: string[]): string | null {
   const known = new Set(
     facts.flatMap((fact) =>
       words(fact).map((word) => word.toLocaleLowerCase()),
@@ -101,10 +106,10 @@ export function namesAreKnown(text: string, facts: string[]): boolean {
     for (const word of sentenceWords.slice(1)) {
       if (!/^[A-Z][a-z]{2,}$/.test(word)) continue;
       const normalized = word.toLocaleLowerCase();
-      if (!known.has(normalized) && !allowed.has(normalized)) return false;
+      if (!known.has(normalized) && !allowed.has(normalized)) return word;
     }
   }
-  return true;
+  return null;
 }
 
 /** The writer's two jobs. The facts name what the home has apart from what is near it, so places never borrow
@@ -656,16 +661,19 @@ export async function run(
           neurons += spent;
           await held.settle(spent);
           const text = reply.content.trim();
-          const clean = scanText(text).length === 0;
+          const blocked = scanText(text);
+          const stranger = unknownName(text, known);
           // A reply stopped at the token limit ends mid sentence, so it is never shown.
           const cut = reply.finish === "length";
-          if (!text || cut || !clean || !namesAreKnown(text, known)) {
+          if (!text || cut || blocked.length || stranger) {
             const why = cut
               ? "cut short"
-              : clean
-                ? "names check"
-                : "fair housing scan";
-            await emit({ t: "fallback", what, why });
+              : blocked.length
+                ? "fair housing scan"
+                : "names check";
+            // The run log names what was caught, so the guard can be seen working.
+            const detail = cut ? "" : blocked.length ? blocked.join(", ") : (stranger ?? "");
+            await emit({ t: "fallback", what, why, ...(detail ? { detail } : {}) });
             continue;
           }
           if (what === "intro") intro = text;

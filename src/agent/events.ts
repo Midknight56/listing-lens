@@ -62,7 +62,7 @@ export type Event =
       scope: string;
       lens: string;
     }
-  | { t: "fallback"; what: string; why: string }
+  | { t: "fallback"; what: string; why: string; detail?: string }
   | {
       t: "usage";
       qloo_upstream: number;
