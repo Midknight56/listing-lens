@@ -265,6 +265,12 @@ export async function brief(id: string, env: StageEnv): Promise<Response> {
     : new Response("Not found", { status: 404 });
 }
 
+/** True only when the secret warm token is set and the request carries it (the owner's recording runs). */
+export function isOperator(request: Request, env: { WARM_TOKEN?: string }): boolean {
+  const token = request.headers.get("X-Warm-Token");
+  return Boolean(env.WARM_TOKEN) && token === env.WARM_TOKEN;
+}
+
 export async function visitorOf(
   request: Request,
   secret: string,

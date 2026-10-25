@@ -107,6 +107,59 @@ export function namesAreKnown(text: string, facts: string[]): boolean {
   return true;
 }
 
+/** The writer's two jobs. The facts name what the home has apart from what is near it, so places never borrow
+ *  the home's features, and no line may say who the home suits (fair housing). */
+export const INTRO_PROMPT = [
+  "You write the opening line of a home staging brief.",
+  "The facts give the area, home_features (things the home itself has) and nearby_places",
+  "(real places in the area, not part of the home).",
+  "Write ONE sentence of at most 25 words about the home and its area. Use only the facts.",
+  "Do not name any place, brand or city that is not in the facts.",
+  "Do not describe people, households, ages, or who the home suits. Plain text, no quotes.",
+].join(" ");
+export const PARAGRAPH_PROMPT = [
+  "You write a listing paragraph of 60 to 80 words.",
+  "home_features are things the home itself has: open with them.",
+  "nearby_places are real places in the area, each with a short note about it.",
+  "They are not part of the home. If places_span is city, say they are in the area, never that they are nearby.",
+  "Pick three of them and give each a few words drawn from its note.",
+  "Do not name any other place, brand or city.",
+  "Do not describe people, households, ages, or who the home suits. No prices, schools or safety claims.",
+  "One paragraph of plain prose.",
+].join(" ");
+const NOTE_CHARS = 120;
+
+export interface WriterFacts {
+  area: string;
+  places_span: "neighbourhood" | "city";
+  home_features: string[];
+  nearby_places: { name: string; about: string }[];
+}
+
+/** Builds what the writer sees. A place note that fails the fair housing scan is left out, not passed on. */
+export function writerFacts(
+  area: string,
+  relaxed: boolean,
+  features: string[],
+  places: { name: string; detail?: string }[],
+): WriterFacts {
+  return {
+    area,
+    places_span: relaxed ? "city" : "neighbourhood",
+    home_features: [...new Set(features)],
+    nearby_places: places.map((place) => {
+      const note = cutAtWord(place.detail ?? "", NOTE_CHARS);
+      return { name: place.name, about: scanText(note).length ? "" : note };
+    }),
+  };
+}
+
+function cutAtWord(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  return cut.slice(0, Math.max(cut.lastIndexOf(" "), 0)).trim();
+}
+
 function words(text: string): string[] {
   return text.match(/[\p{L}][\p{L}'’-]*/gu) ?? [];
 }
@@ -518,6 +571,19 @@ export async function run(
       features: request.features,
     };
     const plain = safeTemplate(baseFacts);
+    const toWriter = writerFacts(
+      scope || request.city,
+      scope !== request.neighbourhood,
+      request.features,
+      localPlaces,
+    );
+    const known = [
+      toWriter.area,
+      request.city,
+      request.neighbourhood ?? "",
+      ...toWriter.home_features,
+      ...toWriter.nearby_places.flatMap((place) => [place.name, place.about]),
+    ];
     let intro = plain.intro;
     let paragraph = plain.paragraph;
     let writtenBy: "model" | "template" = "template";
@@ -543,40 +609,30 @@ export async function run(
     }
     if (writer) {
       const prompts = [
-        [
-          "intro",
-          "Write one concise home staging introduction from these facts only.",
-          60,
-        ],
-        [
-          "paragraph",
-          "Write an 80 word listing paragraph from these facts only.",
-          150,
-        ],
+        ["intro", INTRO_PROMPT, 80],
+        ["paragraph", PARAGRAPH_PROMPT, 220],
       ] as const;
       for (const [what, prompt, max] of prompts) {
         const held = reservations.shift();
         if (!held) break;
         try {
-          const reply = await writer.write(prompt, baseFacts, max);
+          const reply = await writer.write(prompt, toWriter, max);
           const spent =
             reply.neurons ??
             neuronsFor(reply.prompt_tokens, reply.completion_tokens);
           neurons += spent;
           await held.settle(spent);
           const text = reply.content.trim();
-          const facts = [
-            baseFacts.scope,
-            ...baseFacts.places,
-            ...baseFacts.features,
-          ];
           const clean = scanText(text).length === 0;
-          if (!text || !clean || !namesAreKnown(text, facts)) {
-            await emit({
-              t: "fallback",
-              what,
-              why: clean ? "names check" : "fair housing scan",
-            });
+          // A reply stopped at the token limit ends mid sentence, so it is never shown.
+          const cut = reply.finish === "length";
+          if (!text || cut || !clean || !namesAreKnown(text, known)) {
+            const why = cut
+              ? "cut short"
+              : clean
+                ? "names check"
+                : "fair housing scan";
+            await emit({ t: "fallback", what, why });
             continue;
           }
           if (what === "intro") intro = text;

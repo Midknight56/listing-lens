@@ -3,6 +3,7 @@ import { counterKey, VisitorCaps, RunCallBudget } from "../../src/store/caps";
 import { NeuronLedger } from "../../src/store/d1";
 import { FakeD1 } from "./fake-d1";
 import { run, type StageRequest } from "../../src/agent/run";
+import { isOperator } from "../../src/app/stage";
 
 class MemoryCounters {
   private values = new Map<string, number>();
@@ -39,6 +40,25 @@ describe("daily limits", () => {
     for (let i = 0; i < 500; i++)
       expect(await caps.qloo("visitor-" + i)).toBe(true);
     expect(await caps.qloo("last")).toBe(false);
+  });
+  it("lets a recording run pass the visitor cap but never the daily total", async () => {
+    const counters = new MemoryCounters(),
+      caps = new VisitorCaps(counters, () => "day");
+    for (let i = 0; i < 48; i++) expect(await caps.qloo("owner")).toBe(true);
+    for (let i = 48; i < 500; i++) expect(await caps.operatorQloo()).toBe(true);
+    expect(await caps.operatorQloo()).toBe(false);
+    expect(await caps.qloo("someone-else")).toBe(false);
+  });
+  it("treats a request as a recording run only with the exact warm token", () => {
+    const withToken = (token?: string) =>
+      new Request("https://example.test/api/stage", token ? { headers: { "X-Warm-Token": token } } : {});
+    expect(isOperator(withToken("secret-test"), { WARM_TOKEN: "secret-test" })).toBe(true);
+    expect(isOperator(withToken("wrong"), { WARM_TOKEN: "secret-test" })).toBe(false);
+    expect(isOperator(withToken(), { WARM_TOKEN: "secret-test" })).toBe(false);
+    expect(isOperator(withToken(), {})).toBe(false);
+    expect(isOperator(withToken("anything"), { WARM_TOKEN: "" })).toBe(false);
+    const emptyHeader = new Request("https://example.test/api/stage", { headers: { "X-Warm-Token": "" } });
+    expect(isOperator(emptyHeader, { WARM_TOKEN: "" })).toBe(false);
   });
   it("allows 16 Qloo questions per run", () => {
     const budget = new RunCallBudget();

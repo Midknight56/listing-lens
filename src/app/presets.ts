@@ -4,7 +4,7 @@ export interface Preset {
   city: string;
   neighbourhood: string;
   lens: { label: string; anchors: string[] };
-  flipLens: { label: string; anchors: string[] };
+  flip: { label: string; anchors: string[] };
   room: string[];
   features: string[];
 }
@@ -25,7 +25,7 @@ export const PRESETS: Preset[] = [
     city: "Nashville",
     neighbourhood: "East Nashville",
     lens: design,
-    flipLens: classic,
+    flip: classic,
     room: ["IKEA", "West Elm", "Pottery Barn", "CB2"],
     features: ["natural light", "front porch"],
   },
@@ -35,7 +35,7 @@ export const PRESETS: Preset[] = [
     city: "Chicago",
     neighbourhood: "Wicker Park",
     lens: design,
-    flipLens: classic,
+    flip: classic,
     room: ["Crate & Barrel", "IKEA", "Article", "Restoration Hardware"],
     features: ["hardwood floors", "big windows"],
   },
@@ -45,7 +45,7 @@ export const PRESETS: Preset[] = [
     city: "Chicago",
     neighbourhood: "Hyde Park",
     lens: classic,
-    flipLens: design,
+    flip: design,
     room: ["Pottery Barn", "Ethan Allen", "IKEA", "West Elm"],
     features: ["fireplace", "reading nook"],
   },
@@ -55,7 +55,7 @@ export const PRESETS: Preset[] = [
     city: "Halifax",
     neighbourhood: "North End",
     lens: classic,
-    flipLens: design,
+    flip: design,
     room: ["IKEA", "Wayfair", "Pottery Barn", "Article"],
     features: ["front porch", "hardwood floors"],
   },
@@ -65,7 +65,7 @@ export const PRESETS: Preset[] = [
     city: "Toronto",
     neighbourhood: "Kensington Market",
     lens: design,
-    flipLens: classic,
+    flip: classic,
     room: ["IKEA", "CB2", "Muji", "Wayfair"],
     features: ["natural light", "patio"],
   },
@@ -75,7 +75,7 @@ export const PRESETS: Preset[] = [
     city: "Los Angeles",
     neighbourhood: "Silver Lake",
     lens: design,
-    flipLens: classic,
+    flip: classic,
     room: ["West Elm", "Restoration Hardware", "IKEA", "Article"],
     features: ["patio", "open kitchen"],
   },
@@ -105,7 +105,7 @@ export function preset(id: string | undefined): Preset | undefined {
 export function lensesFor(
   item: Preset,
 ): { label: string; anchors: string[] }[] {
-  return [item.lens, item.flipLens];
+  return [item.lens, item.flip];
 }
 
 export function presetsPayload(): {
@@ -122,5 +122,5 @@ export function presetsPayload(): {
 }
 
 export function presetLensKey(item: Preset, label: string): string {
-  return label === item.flipLens.label ? item.flipLens.label : item.lens.label;
+  return label === item.flip.label ? item.flip.label : item.lens.label;
 }

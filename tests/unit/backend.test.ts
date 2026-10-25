@@ -174,9 +174,12 @@ describe("backend copy and scoring rules", () => {
     ]);
     expect(PRESETS[2].lens.label).toBe("Classic comfort");
     expect(
-      PRESETS.every((item) => item.flipLens.label !== item.lens.label),
+      PRESETS.every((item) => item.flip.label !== item.lens.label),
     ).toBe(true);
     expect(FEATURES).toHaveLength(14);
+    // The page reads preset.flip (public/app.js), so the payload must carry that exact field.
+    const first = presetsPayload().presets[0] as unknown as Record<string, { label?: string }>;
+    expect(first.flip?.label).toBe("Classic comfort");
     expect(Object.keys(presetsPayload())).toEqual([
       "presets",
       "lenses",

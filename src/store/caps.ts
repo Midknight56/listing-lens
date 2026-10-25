@@ -44,6 +44,11 @@ export class VisitorCaps {
         ok && (await this.take(this.key("daily-qloo"), DAILY_QLOO_CALLS)),
     );
   }
+  /** The owner's recording runs (warm token) skip the per visitor cap but still count against the daily total,
+   *  so the 500 call ceiling and its $0 arithmetic hold for every caller. */
+  operatorQloo(): Promise<boolean> {
+    return this.take(this.key("daily-qloo"), DAILY_QLOO_CALLS);
+  }
   plain(visitor: string): Promise<boolean> {
     return this.take(this.key("plain", visitor), DAILY_PLAIN_PER_VISITOR);
   }

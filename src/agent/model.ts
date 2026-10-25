@@ -3,6 +3,8 @@ export interface TextReply {
   prompt_tokens: number;
   completion_tokens: number;
   neurons?: number;
+  /** "length" means the reply stopped at the token limit. */
+  finish?: string;
 }
 export interface TextWriter {
   write(prompt: string, facts: unknown, maxTokens: number): Promise<TextReply>;
@@ -40,6 +42,9 @@ export class BoundTextWriter implements TextWriter {
       content,
       prompt_tokens: raw.usage?.prompt_tokens ?? 0,
       completion_tokens: raw.usage?.completion_tokens ?? 0,
+      ...(typeof raw.choices?.[0]?.finish_reason === "string"
+        ? { finish: raw.choices[0].finish_reason }
+        : {}),
       ...(typeof raw.usage?.neurons === "number"
         ? { neurons: raw.usage.neurons }
         : {}),
@@ -49,6 +54,7 @@ export class BoundTextWriter implements TextWriter {
 
 interface ModelReply {
   choices?: {
+    finish_reason?: string | null;
     message?: {
       content?: string | null;
       reasoning?: string | null;

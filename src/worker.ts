@@ -4,6 +4,7 @@ import {
   brief,
   cachedCatalog,
   visitorOf,
+  isOperator,
   type StageEnv,
 } from "./app/stage";
 import { presetsPayload } from "./app/presets";
@@ -80,6 +81,7 @@ async function count(
   env: Env,
   visitor: string,
   kind: "fresh" | "plain" | "qloo",
+  operator = false,
 ): Promise<boolean> {
   const caps = new VisitorCaps({
     take: async (key, cap) => {
@@ -95,7 +97,9 @@ async function count(
       await counter(env, name).put(day, value, ttl);
     },
   });
-  if (kind === "qloo") return caps.qloo(visitor);
+  if (kind === "qloo") return operator ? caps.operatorQloo() : caps.qloo(visitor);
+  // Recording runs are not visitor runs; the neuron ledger and the daily Qloo total still apply to them.
+  if (operator) return true;
   return kind === "fresh" ? caps.fresh(visitor) : caps.plain(visitor);
 }
 
@@ -128,9 +132,10 @@ export default {
     }
     const session = env.SESSION_SECRET ?? "";
     const visitor = await visitorOf(request, session);
+    const operator = isOperator(request, env);
     const cache = new D1Cache(env.DB);
     const qloo = new QlooClient(env.QLOO_KEY ?? "", workerFetch, cache, () =>
-      count(env, visitor, "qloo"),
+      count(env, visitor, "qloo", operator),
     );
     const writer = env.WRITER ? new BoundTextWriter(env.WRITER) : undefined;
     if (url.pathname === "/api/stage") {
@@ -138,14 +143,14 @@ export default {
         qloo,
         ...(writer ? { writer } : {}),
         catalog: await cachedCatalog(env),
-        count: (kind) => count(env, visitor, kind),
+        count: (kind) => count(env, visitor, kind, operator),
       });
     }
     if (url.pathname === "/api/plain") {
       return plain(request, env, {
         qloo,
         ...(writer ? { writer } : {}),
-        count: (kind) => count(env, visitor, kind),
+        count: (kind) => count(env, visitor, kind, operator),
       });
     }
     const briefMatch = /^\/api\/brief\/([0-9a-f-]{36})$/.exec(url.pathname);
@@ -186,10 +191,7 @@ export default {
 };
 
 async function warm(request: Request, env: Env): Promise<Response> {
-  if (
-    !env.WARM_TOKEN ||
-    request.headers.get("X-Warm-Token") !== env.WARM_TOKEN
-  ) {
+  if (!isOperator(request, env)) {
     return new Response("Not found", { status: 404 });
   }
   if (!env.SESSION_SECRET)
@@ -199,7 +201,7 @@ async function warm(request: Request, env: Env): Promise<Response> {
   const visitor = await visitorOf(request, env.SESSION_SECRET);
   const cache = new D1Cache(env.DB);
   const qloo = new QlooClient(env.QLOO_KEY ?? "", workerFetch, cache, () =>
-    count(env, visitor, "qloo"),
+    count(env, visitor, "qloo", true),
   );
   const saved: string[] = [];
   for (const name of HOME_BRANDS) {
