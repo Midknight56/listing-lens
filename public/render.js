@@ -66,8 +66,10 @@ function cardsHtml(section) {
   const body = section.thin || items.length < 3
     ? '<p class="thin">Thin data here</p>'
     : `<div class="result-grid">${items.map((item) => {
-      const image = typeof item.image === 'string' && item.image.trim() ? `<img class="result-thumb" src="${escapeHtml(item.image)}" loading="lazy" referrerpolicy="no-referrer" alt="">` : '<span class="result-thumb-empty" aria-hidden="true"></span>';
-      return `<article class="result-card has-image">${image}<h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.why || item.detail || 'A match for this lens and place.')}</p><span class="affinity">Affinity ${score(item.affinity)}</span></article>`;
+      // A card with no picture shows no box: an empty grey square reads as a broken image.
+      const hasImage = typeof item.image === 'string' && item.image.trim() !== '';
+      const image = hasImage ? `<img class="result-thumb" src="${escapeHtml(item.image)}" loading="lazy" referrerpolicy="no-referrer" alt="">` : '';
+      return `<article class="result-card${hasImage ? ' has-image' : ''}">${image}<h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.why || item.detail || 'A match for this lens and place.')}</p><span class="affinity">Affinity ${score(item.affinity)}</span></article>`;
     }).join('')}</div>`;
   return `<section class="result-section"><h2>${escapeHtml(title)}</h2>${body}</section>`;
 }

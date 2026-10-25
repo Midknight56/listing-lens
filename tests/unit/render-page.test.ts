@@ -69,14 +69,15 @@ describe('Listing Lens render functions', () => {
     expect(html).not.toContain('—');
   });
 
-  it('renders lazy thumbnails with a neutral fallback when no image exists', () => {
+  it('renders lazy thumbnails, and no empty box when a pick has no image', () => {
     const html = renderBrief([{ t: 'section', key: 'brands', items: [
       { name: 'A', affinity: 0.9, image: 'https://images.example.invalid/a.jpg' },
       { name: 'B', affinity: 0.8 }, { name: 'C', affinity: 0.7 },
     ] }]);
     expect(html).toContain('loading="lazy"');
     expect(html).toContain('referrerpolicy="no-referrer"');
-    expect(html).toContain('result-thumb-empty');
+    expect(html).not.toContain('result-thumb-empty');
+    expect(html.match(/class="result-card has-image"/g)).toHaveLength(1);
   });
 
   it('provides synthetic flip and running development event sets', async () => {
