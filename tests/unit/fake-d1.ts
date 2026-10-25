@@ -23,6 +23,8 @@ export class FakeD1 {
   constructor() {
     const migration = readFileSync(resolve(process.cwd(), 'migrations/0001_init.sql'), 'utf8')
     this.database.exec(migration)
+    const briefs = readFileSync(resolve(process.cwd(), 'migrations/0002_briefs.sql'), 'utf8')
+    this.database.exec(briefs)
   }
   prepare(sql: string): { bind(...v: unknown[]): FakeStatement } {
     return new FakeStatement(this.database, sql)
