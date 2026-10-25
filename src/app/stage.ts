@@ -251,8 +251,12 @@ export async function stage(
     return send(events, 503);
   }
   await store.save(id, parsed, events, mode);
-  await store.cache(key, id);
-  if (recordingKey) await store.cache(recordingKey, id);
+  // Only a run the writer finished becomes the answer others replay. A run that fell back to the template (the day's
+  // writing allowance spent) keeps its share link but never replaces a written recording.
+  if (mode === "live") await store.cache(key, id);
+  if (recordingKey && (mode === "live" || !recordedId)) {
+    await store.cache(recordingKey, id);
+  }
   return send(events);
 }
 

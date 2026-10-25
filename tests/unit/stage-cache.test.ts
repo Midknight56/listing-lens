@@ -205,6 +205,47 @@ describe("run recording", () => {
     }
   });
 
+  it("keeps a written recording when a later run falls back to the template", async () => {
+    const db = new FakeD1();
+    const preset = PRESETS[0];
+    const original = {
+      city: preset.city,
+      neighbourhood: preset.neighbourhood,
+      lens: preset.lens,
+      room: preset.room,
+      features: preset.features,
+      preset: preset.id,
+    };
+    const writer = {
+      write: async () => ({
+        content: "The home has natural light.",
+        prompt_tokens: 1,
+        completion_tokens: 1,
+        finish: "stop",
+      }),
+    };
+    const lines = async (response: Response) =>
+      (await response.text()).trim().split("\n").map((line) => JSON.parse(line));
+    try {
+      const env = { DB: db, SESSION_SECRET: "synthetic-secret" };
+      const first = await lines(await stage(post(original), env, { qloo: dependencies().qloo, writer }));
+      expect(first[0].mode).toBe("live");
+      // The day's writing allowance is now spent, so the next run is written by the template.
+      db.insertCall("listing-lens", new Date().toISOString().slice(0, 10), 450);
+      const changed = { ...original, room: ["New Sample Brand"] };
+      const second = await lines(await stage(post(changed), env, { qloo: dependencies().qloo, writer }));
+      expect(second[0].mode).toBe("template");
+      // Asked again with no fresh runs left, the changed request replays the written recording, not the template.
+      const third = await lines(
+        await stage(post(changed), env, { qloo: dependencies(true).qloo, writer, count: async () => false }),
+      );
+      expect(third[0].mode).toBe("replay");
+      expect(third.find((event) => event.t === "brief").written_by).toBe("model");
+    } finally {
+      db.close();
+    }
+  });
+
   it("answers with 503 when the session secret is missing", async () => {
     const db = new FakeD1();
     try {
