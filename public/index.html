@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f5f3">
+  <title>Listing Lens</title>
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <main class="page">
+    <header class="masthead"><a href="/" class="wordmark">Listing Lens</a><span id="mode-badge" class="mode-badge" hidden></span></header>
+    <form id="stage-form" class="form-panel">
+      <section class="field-group"><h1>Stage a listing</h1><p class="quiet">Start with a place and a point of view.</p><h2>Start with a preset</h2><div id="presets" class="chip-row" aria-label="Presets"></div></section>
+      <div class="two-column">
+        <label>City<input id="city" name="city" required minlength="2" maxlength="60" autocomplete="address-level2"></label>
+        <label>Neighbourhood<input id="neighbourhood" name="neighbourhood" maxlength="60" autocomplete="address-level3"></label>
+      </div>
+      <section class="field-group"><h2>Buyer lens</h2><div id="lens-chips" class="chip-row"></div><label class="lens-label">Type three loves</label><div class="three-column"><label><span class="sr-only">First love</span><input class="anchor" maxlength="60" placeholder="A brand, artist or book"></label><label><span class="sr-only">Second love</span><input class="anchor" maxlength="60" placeholder="Another thing they love"></label><label><span class="sr-only">Third love</span><input class="anchor" maxlength="60" placeholder="One more thing"></label></div></section>
+      <section class="field-group"><h2>Brands in the room</h2><div id="room-chips" class="chip-row"></div><div class="add-row"><label class="grow">Add a brand<input id="room-input" maxlength="60" placeholder="Brand name"></label><button id="add-room" type="button" class="quiet-button">Add</button></div></section>
+      <fieldset class="field-group feature-group"><legend>Home features</legend><div id="feature-list" class="feature-grid"></div></fieldset>
+      <button class="primary-button" type="submit">Stage it</button>
+    </form>
+    <section id="error-box" class="error-box" aria-live="polite" hidden></section>
+    <details id="run-log" class="run-log" open><summary id="run-summary">Run log</summary><div id="run-lines" aria-live="polite"></div></details>
+    <nav class="tabs" aria-label="Brief view"><button type="button" class="tab active" data-tab="brief">Brief</button><button type="button" class="tab" data-tab="plain">Qloo off</button></nav>
+    <section id="brief-view" class="brief-view">
+      <section id="brief-content" class="brief-content" aria-live="polite"><p class="empty-note">Choose a preset or enter a place to begin.</p></section>
+      <section id="lens-diff" class="lens-diff" hidden></section>
+      <div class="action-row"><button id="lens-toggle" type="button" class="quiet-button" hidden></button><button id="share-button" type="button" class="quiet-button" hidden>Copy share link</button><button id="print-button" type="button" class="quiet-button" hidden>Print</button></div>
+    </section>
+    <section id="plain-view" class="plain-view" hidden><div id="plain-content"></div></section>
+    <footer class="fair-note">A decor and marketing brief. It describes the home and the area, never who should live there.</footer>
+  </main>
+</body>
+</html>
