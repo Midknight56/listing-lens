@@ -120,3 +120,15 @@ describe('Listing Lens render functions', () => {
     expect(JSON.stringify(events)).toContain('ent-test-');
   });
 });
+
+describe('recorded date', () => {
+  it('shows the UTC day a brief was recorded, even for a viewer west of Greenwich', () => {
+    const before = process.env.TZ;
+    process.env.TZ = 'America/Halifax';
+    try {
+      expect(modeLabel({ mode: 'replay', recorded_at: '2026-10-25' })).toBe('Recorded on Oct 25, 2026');
+    } finally {
+      process.env.TZ = before;
+    }
+  });
+});

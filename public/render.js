@@ -13,7 +13,10 @@ export function modeLabel(event = {}) {
   if (event.mode === 'template') return "Plain text mode: today's writing budget is spent";
   if (event.mode === 'cache') return 'From cache';
   if (event.mode === 'replay') {
-    const date = event.recorded_at ? new Date(event.recorded_at).toLocaleDateString() : '';
+    // The date is a UTC day; read it as UTC, or a viewer west of Greenwich sees the day before.
+    const date = event.recorded_at
+      ? new Date(event.recorded_at).toLocaleDateString('en', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' })
+      : '';
     return date ? `Recorded on ${date}` : 'Recorded brief';
   }
   if (event.mode === 'off') return 'Qloo off';
