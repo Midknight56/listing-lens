@@ -1,10 +1,126 @@
-export interface Preset { id: string; label: string; city: string; neighbourhood: string; lens: { label: string; anchors: string[] }; room: string[]; features: string[] }
+export interface Preset {
+  id: string;
+  label: string;
+  city: string;
+  neighbourhood: string;
+  lens: { label: string; anchors: string[] };
+  flipLens: { label: string; anchors: string[] };
+  room: string[];
+  features: string[];
+}
+
+const design = {
+  label: "Design forward",
+  anchors: ["Herman Miller", "Kinfolk", "Khruangbin"],
+};
+const classic = {
+  label: "Classic comfort",
+  anchors: ["Pottery Barn", "Martha Stewart Living", "Norah Jones"],
+};
+
 export const PRESETS: Preset[] = [
-  { id: 'east-nashville-design', label: 'East Nashville design', city: 'Nashville', neighbourhood: 'East Nashville', lens: { label: 'Design forward', anchors: ['Herman Miller', 'Kinfolk', 'Khruangbin'] }, room: ['IKEA', 'West Elm'], features: ['natural light', 'front porch'] },
-  { id: 'nashville-classic', label: 'Nashville classic', city: 'Nashville', neighbourhood: '', lens: { label: 'Classic comfort', anchors: ['Pottery Barn', 'Martha Stewart Living', 'Norah Jones'] }, room: ['Pottery Barn', 'CB2'], features: ['fireplace', 'hardwood floors'] },
-  { id: 'hyde-park-design', label: 'Hyde Park design', city: 'Chicago', neighbourhood: 'Hyde Park', lens: { label: 'Design forward', anchors: ['Herman Miller', 'Kinfolk', 'Khruangbin'] }, room: ['West Elm', 'IKEA'], features: ['reading nook', 'big windows'] },
-  { id: 'wicker-park-classic', label: 'Wicker Park classic', city: 'Chicago', neighbourhood: 'Wicker Park', lens: { label: 'Classic comfort', anchors: ['Pottery Barn', 'Martha Stewart Living', 'Norah Jones'] }, room: ['Pottery Barn', 'CB2'], features: ['updated bath', 'high ceilings'] },
-  { id: 'toronto-design', label: 'Toronto design', city: 'Toronto', neighbourhood: 'West Queen West', lens: { label: 'Design forward', anchors: ['Herman Miller', 'Kinfolk', 'Khruangbin'] }, room: ['IKEA', 'West Elm'], features: ['open kitchen', 'patio'] },
-  { id: 'nashville-design', label: 'Nashville design', city: 'Nashville', neighbourhood: '', lens: { label: 'Design forward', anchors: ['Herman Miller', 'Kinfolk', 'Khruangbin'] }, room: ['CB2', 'West Elm'], features: ['garden', 'home office'] },
-]
-export function preset(id: string | undefined): Preset | undefined { return PRESETS.find((item) => item.id === id) }
+  {
+    id: "east-nashville",
+    label: "East Nashville",
+    city: "Nashville",
+    neighbourhood: "East Nashville",
+    lens: design,
+    flipLens: classic,
+    room: ["IKEA", "West Elm", "Pottery Barn", "CB2"],
+    features: ["natural light", "front porch"],
+  },
+  {
+    id: "wicker-park",
+    label: "Wicker Park",
+    city: "Chicago",
+    neighbourhood: "Wicker Park",
+    lens: design,
+    flipLens: classic,
+    room: ["Crate & Barrel", "IKEA", "Article", "Restoration Hardware"],
+    features: ["hardwood floors", "big windows"],
+  },
+  {
+    id: "hyde-park",
+    label: "Hyde Park",
+    city: "Chicago",
+    neighbourhood: "Hyde Park",
+    lens: classic,
+    flipLens: design,
+    room: ["Pottery Barn", "Ethan Allen", "IKEA", "West Elm"],
+    features: ["fireplace", "reading nook"],
+  },
+  {
+    id: "north-end-halifax",
+    label: "North End",
+    city: "Halifax",
+    neighbourhood: "North End",
+    lens: classic,
+    flipLens: design,
+    room: ["IKEA", "Wayfair", "Pottery Barn", "Article"],
+    features: ["front porch", "hardwood floors"],
+  },
+  {
+    id: "kensington-market",
+    label: "Kensington Market",
+    city: "Toronto",
+    neighbourhood: "Kensington Market",
+    lens: design,
+    flipLens: classic,
+    room: ["IKEA", "CB2", "Muji", "Wayfair"],
+    features: ["natural light", "patio"],
+  },
+  {
+    id: "silver-lake",
+    label: "Silver Lake",
+    city: "Los Angeles",
+    neighbourhood: "Silver Lake",
+    lens: design,
+    flipLens: classic,
+    room: ["West Elm", "Restoration Hardware", "IKEA", "Article"],
+    features: ["patio", "open kitchen"],
+  },
+];
+
+export const FEATURES = [
+  "natural light",
+  "open kitchen",
+  "front porch",
+  "home office",
+  "garden",
+  "fireplace",
+  "hardwood floors",
+  "walk in closet",
+  "updated bath",
+  "big windows",
+  "high ceilings",
+  "patio",
+  "workshop",
+  "reading nook",
+];
+
+export function preset(id: string | undefined): Preset | undefined {
+  return PRESETS.find((item) => item.id === id);
+}
+
+export function lensesFor(
+  item: Preset,
+): { label: string; anchors: string[] }[] {
+  return [item.lens, item.flipLens];
+}
+
+export function presetsPayload(): {
+  presets: Preset[];
+  lenses: { label: string; anchors: string[] }[];
+  features: string[];
+} {
+  const lenses = [
+    ...new Map(
+      PRESETS.flatMap(lensesFor).map((lens) => [lens.label, lens]),
+    ).values(),
+  ];
+  return { presets: PRESETS, lenses, features: FEATURES };
+}
+
+export function presetLensKey(item: Preset, label: string): string {
+  return label === item.flipLens.label ? item.flipLens.label : item.lens.label;
+}

@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS home_catalog (
+  name TEXT PRIMARY KEY,
+  entity_id TEXT NOT NULL,
+  cached_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS quota (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  remaining INTEGER NOT NULL,
+  checked_at INTEGER NOT NULL
+);
