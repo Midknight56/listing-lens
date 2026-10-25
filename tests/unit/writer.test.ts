@@ -7,6 +7,7 @@ import {
 } from "../../src/agent/run";
 import type { TextReply } from "../../src/agent/model";
 import { unknownName } from "../../src/agent/run";
+import { ideas, PLAIN_PROMPT } from "../../src/app/plain";
 
 const entity = (id: string, name: string, type: string, detail?: string) => ({
   id,
@@ -151,5 +152,28 @@ describe("writer run", () => {
       { t: "fallback", what: "intro", why: "names check", detail: "Wrigley" },
       { t: "fallback", what: "paragraph", why: "fair housing scan", detail: expect.stringContaining("famil") },
     ]);
+  });
+});
+
+describe("plain picks", () => {
+  it("drops names that only repeat the input and keeps the model's own", () => {
+    const reply = JSON.stringify({
+      brands: ["Herman Miller", "Muuto", "HAY", "Vitra", "Cassina"],
+      places: ["Test City", "The Station Inn", "Lemon Grass", "The 5 Spot", "Bluebird Cafe"],
+    });
+    expect(ideas(reply, ["Test City", "Herman Miller", "IKEA"])).toEqual({
+      brands: ["Muuto", "HAY", "Vitra", "Cassina"],
+      places: ["The Station Inn", "Lemon Grass", "The 5 Spot", "Bluebird Cafe"],
+    });
+  });
+  it("refuses a reply that is all echo", () => {
+    const echo = JSON.stringify({
+      brands: ["Herman Miller", "Kinfolk", "IKEA", "West Elm"],
+      places: ["Test City", "Khruangbin", "Pottery Barn", "CB2"],
+    });
+    expect(
+      ideas(echo, ["Test City", "Herman Miller", "Kinfolk", "Khruangbin", "IKEA", "West Elm", "Pottery Barn", "CB2"]),
+    ).toBeNull();
+    expect(PLAIN_PROMPT).toContain("Do not repeat");
   });
 });

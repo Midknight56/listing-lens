@@ -1,8 +1,18 @@
 // Listing Lens end to end play through. Run through the shared browser lock.
 //   node tools/e2e.mjs [base url]
 import { execSync } from 'node:child_process'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
+
+// Optional: --token-file <file with WARM_TOKEN=...> sends the operator header, so test runs skip the per visitor
+// caps (the daily totals still apply). The token is never printed.
+function operatorHeaders() {
+  const at = process.argv.indexOf('--token-file')
+  if (at < 0) return {}
+  const rows = readFileSync(process.argv[at + 1], 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/)
+  const line = rows.find((row) => row.startsWith('WARM_TOKEN=')) ?? rows[0]
+  return { 'X-Warm-Token': line.replace(/^WARM_TOKEN=/, '').trim().replace(/^"|"$/g, '') }
+}
 
 const BASE = (process.argv.slice(2).find((arg) => arg.startsWith('http')) ?? 'http://127.0.0.1:8787').replace(/\/$/, '')
 const results = []
@@ -25,7 +35,9 @@ async function startPreset(page, presetName = 'East Nashville') {
   await page.locator('#stage-form button[type="submit"]').click()
 }
 async function clearRoom(page) {
-  for (const button of await page.locator('#room-chips button').all()) await button.click()
+  // Each removal redraws the chips, so always take the first one again.
+  const chips = page.locator('#room-chips button')
+  for (let left = await chips.count(); left > 0; left--) await chips.first().click()
 }
 
 async function main() {
@@ -33,7 +45,7 @@ async function main() {
   if (busy) { console.log(`HELD: ${busy} headless browser processes of another run are alive`); process.exit(3) }
   mkdirSync('out', { recursive: true })
   const browser = await chromium.launch({ headless: true })
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] })
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'], extraHTTPHeaders: operatorHeaders() })
   const page = await context.newPage()
   const errors = []
   const stageBodies = []
@@ -69,7 +81,8 @@ async function main() {
     check('template mode badge is clear when the brief uses a template', !templateWritten || /Plain text mode/i.test(await page.locator('#mode-badge').innerText()))
 
     const originalParagraph = await page.locator('#listing-paragraph').innerText()
-    await page.locator('#lens-toggle').click()
+    // The flip is the lens switch inside the brief; the old action row button stays hidden.
+    await page.locator('[data-lens-switch]').first().click()
     await page.locator('#lens-diff:not([hidden])').waitFor({ timeout: 120000 })
     check('lens flip shows the difference', await page.locator('#lens-diff').getByText('Lens difference').count() > 0)
     const firstStage = stageBodies.at(-2), flippedStage = stageBodies.at(-1)
@@ -90,8 +103,14 @@ async function main() {
 
     await page.locator('[data-tab="plain"]').click()
     await page.getByText('Asking the same model with no Qloo').waitFor({ timeout: 15000 }).catch(() => {})
-    await page.locator('#plain-content li').first().waitFor({ timeout: 120000 })
-    check('Qloo off renders plain brand and place picks', /Brands/.test(await page.locator('#plain-content').innerText()) && /Places/.test(await page.locator('#plain-content').innerText()))
+    // When the day's writing allowance is spent the tab says so calmly instead; the detail says which case ran.
+    await page.waitForFunction(() => {
+      const text = document.querySelector('#plain-content')?.textContent || ''
+      return document.querySelector('#plain-content li') || /spent for today|not available/i.test(text)
+    }, null, { timeout: 120000 })
+    const plainText = await page.locator('#plain-content').innerText()
+    const picks = /Brands/.test(plainText) && /Places/.test(plainText)
+    check('Qloo off renders plain picks, or says calmly that writing is spent', picks || /spent for today/i.test(plainText), picks ? 'picks shown' : plainText.slice(0, 80))
 
     // Bad path: an unknown city remains calm and does not damage the page.
     await page.goto(BASE + '/')

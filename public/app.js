@@ -173,7 +173,9 @@ async function postRun(url, body, { reset = true } = {}) {
   if (reset) resetRun();
   try {
     const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!response.ok || !response.body) { const info = await response.json().catch(() => ({})); throw new Error(info.error || 'The brief could not start. Try a preset.'); }
+    // A refusal still comes as run log lines, so its own words (which love was refused, which city was not found) show.
+    const streamed = /ndjson/.test(response.headers.get('Content-Type') || '');
+    if ((!response.ok && !streamed) || !response.body) { const info = await response.json().catch(() => ({})); throw new Error(info.error || 'The brief could not start. Try a preset.'); }
     await readNdjson(response, handleEvent);
   } catch (error) { errorBox.textContent = error instanceof Error ? error.message : 'The brief could not start. Try a preset.'; errorBox.hidden = false; }
   finally { busy = false; form.querySelector('.primary-button').disabled = false; }

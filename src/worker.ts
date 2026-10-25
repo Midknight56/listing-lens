@@ -155,21 +155,9 @@ export default {
     }
     const briefMatch = /^\/api\/brief\/([0-9a-f-]{36})$/.exec(url.pathname);
     if (briefMatch) return brief(briefMatch[1], env);
-    const shareMatch = /^\/s\/([0-9a-f-]{36})$/.exec(url.pathname);
-    if (shareMatch) {
-      const record = await brief(shareMatch[1], env);
-      if (!record.ok) return record;
-      const data = (await record.json()) as {
-        events: { t: string; intro?: string; paragraph?: string }[];
-      };
-      const briefEvent = data.events.find((event) => event.t === "brief");
-      const html =
-        '<!doctype html><meta charset="utf-8"><title>Listing Lens brief</title>' +
-        `<main><h1>${escape(briefEvent?.intro ?? "Staging brief")}</h1>` +
-        `<p>${escape(briefEvent?.paragraph ?? "")}</p></main>`;
-      return new Response(html, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+    if (/^\/s\/[^/]+$/.test(url.pathname)) {
+      // A share link opens the full app, which loads the brief from /api/brief/<id> or says calmly that it is gone.
+      return env.ASSETS.fetch(new Request(new URL("/", url), request));
     }
     if (url.pathname === "/mcp") {
       const server = new McpServer({
@@ -222,16 +210,3 @@ async function warm(request: Request, env: Env): Promise<Response> {
   return Response.json({ saved: saved.length });
 }
 
-function escape(value: string): string {
-  return value.replace(
-    /[&<>"']/g,
-    (char) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[char]!,
-  );
-}

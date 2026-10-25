@@ -1,8 +1,18 @@
 // Check the empty page and an East Nashville brief at phone and tablet widths.
 //   node tools/phones.mjs [base url]
 import { execSync } from 'node:child_process'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
+
+// Optional: --token-file <file with WARM_TOKEN=...> sends the operator header, so test runs skip the per visitor
+// caps (the daily totals still apply). The token is never printed.
+function operatorHeaders() {
+  const at = process.argv.indexOf('--token-file')
+  if (at < 0) return {}
+  const rows = readFileSync(process.argv[at + 1], 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/)
+  const line = rows.find((row) => row.startsWith('WARM_TOKEN=')) ?? rows[0]
+  return { 'X-Warm-Token': line.replace(/^WARM_TOKEN=/, '').trim().replace(/^"|"$/g, '') }
+}
 
 const BASE = (process.argv.slice(2).find((arg) => arg.startsWith('http')) ?? 'http://127.0.0.1:8787').replace(/\/$/, '')
 const WIDTHS = [320, 344, 360, 375, 390, 393, 402, 412, 420, 440, 466, 669, 707, 820, 1280]
@@ -66,7 +76,7 @@ async function main() {
   const browser = await chromium.launch({ headless: true })
   try {
     for (const width of WIDTHS) {
-      const context = await browser.newContext({ viewport: { width, height: width > 600 ? 1024 : 800 }, deviceScaleFactor: 2, isMobile: width < 600, hasTouch: width < 600 })
+      const context = await browser.newContext({ viewport: { width, height: width > 600 ? 1024 : 800 }, deviceScaleFactor: 2, isMobile: width < 600, hasTouch: width < 600, extraHTTPHeaders: operatorHeaders() })
       const page = await context.newPage()
       await page.goto(BASE + '/')
       await page.locator('.preset-card').first().waitFor({ timeout: 15000 })

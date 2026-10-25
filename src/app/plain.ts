@@ -9,7 +9,18 @@ interface PlainIdeas {
   brands: string[];
   places: string[];
 }
-function ideas(text: string): PlainIdeas | null {
+/** The model's own picks with no taste data. Asked for five of each so four remain after echoes are dropped. */
+export const PLAIN_PROMPT = [
+  "From general knowledge only, suggest five furniture or home decor brands and five real places in the city",
+  "(restaurants, bars, shops, venues) that a buyer with these interests might like.",
+  "Do not repeat any interest, room brand or the city name.",
+  "Answer with JSON only, using exactly the keys brands and places, each a list of names.",
+].join(" ");
+
+/** Reads four brands and four places, dropping any name that only repeats the input (an interest, a room brand, the
+ *  city), since an echo says nothing about what the model knows. */
+export function ideas(text: string, echoes: string[] = []): PlainIdeas | null {
+  const repeated = new Set(echoes.map((name) => name.trim().toLocaleLowerCase()));
   const first = text.indexOf("{"),
     last = text.lastIndexOf("}");
   if (first < 0 || last < first) return null;
@@ -23,12 +34,12 @@ function ideas(text: string): PlainIdeas | null {
     const brands = value.brands
       .filter((item): item is string => typeof item === "string")
       .map((item) => item.trim())
-      .filter(Boolean)
+      .filter((item) => item && !repeated.has(item.toLocaleLowerCase()))
       .slice(0, 4);
     const places = value.places
       .filter((item): item is string => typeof item === "string")
       .map((item) => item.trim())
-      .filter(Boolean)
+      .filter((item) => item && !repeated.has(item.toLocaleLowerCase()))
       .slice(0, 4);
     return brands.length === 4 && places.length === 4
       ? { brands, places }
@@ -89,17 +100,11 @@ export async function plain(
   ];
   let settled = false;
   try {
-    const prompt = [
-      "Return four furniture brand names and four local place names as JSON.",
-      "Use exactly the keys brands and places.",
-      "Use only the city, interests and room facts given.",
-    ].join(" ");
     const reply = await deps.writer.write(
-      prompt,
+      PLAIN_PROMPT,
       {
         city: scope,
         interests: saved.request.lens.anchors,
-        lens: saved.request.lens.label,
         room: saved.request.room,
       },
       220,
@@ -108,7 +113,12 @@ export async function plain(
       reply.neurons ?? neuronsFor(reply.prompt_tokens, reply.completion_tokens),
     );
     settled = true;
-    const result = ideas(reply.content);
+    const result = ideas(reply.content, [
+      scope,
+      saved.request.city,
+      ...saved.request.lens.anchors,
+      ...saved.request.room,
+    ]);
     if (!result || scanText(reply.content).length)
       return fail("Plain picks did not pass the text check.", 422);
     const anchors = (
