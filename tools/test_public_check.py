@@ -9,6 +9,7 @@ import sys
 import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
+FAKE_ID = "-".join(["0000AAAA", "0000", "4000", "8000", "00000000F1F1"])
 
 
 def load(root):
@@ -47,7 +48,8 @@ def main():
     (secrets / "qloo-test-key.local.txt").write_text("hack_0123456789abcdef0123456789abcdef\n# comment\n", encoding="utf-8")
     cases = {
         "clean": ({"README.md": "Plain words, no faults.\n"}, empty, 0),
-        "qloo data": ({"data.json": '{"entity_id": "0000AAAA-0000-4000-8000-00000000F1F1", "affinity": 0.9}\n'}, empty, 1),
+        # The fake id is joined at run time, so this file never holds the pattern it plants.
+        "qloo data": ({"data.json": '{"entity_id": "' + FAKE_ID + '", "affinity": 0.9}\n'}, empty, 1),
         "samples folder": ({"samples/runs.json": "{}\n"}, empty, 1),
         "dash in readme": ({"README.md": "A brief — for stagers.\n"}, empty, 1),
         "dash in page string": ({"public/app.js": "const t = 'keep - swap'\n"}, empty, 1),
