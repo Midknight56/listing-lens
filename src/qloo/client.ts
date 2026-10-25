@@ -8,8 +8,8 @@ export interface Locality { id: string; name: string; disambiguation: string }
 export interface Cache { get(key: string): Promise<string | null>; put(key: string, value: string, opts?: { expirationTtl?: number }): Promise<void> }
 export interface Answer<T> { results: T[]; cached: boolean; locality?: Locality | null }
 export class QlooError extends Error {}
-export class QlooBusy extends QlooError { constructor() { super('Today’s Qloo question limit has been reached.') } }
-export class QlooOff extends QlooError { constructor() { super('Live results are off right now.') } }
+export class QlooBusy extends QlooError { constructor() { super('Today’s taste question limit has been reached. Try an example below.') } }
+export class QlooOff extends QlooError { constructor() { super('Live taste results are off right now. Try an example below.') } }
 interface RawEntity { entity_id?: string; name?: string; types?: string[]; subtype?: string; popularity?: number; query?: { affinity?: number; explainability?: Record<string, unknown> }; properties?: { short_description?: string; address?: string }; tags?: { name?: string }[] }
 interface RawBody { results?: { entities?: RawEntity[]; tags?: unknown[] }; query?: { localities?: { signal?: { entity_id?: string; name?: string; disambiguation?: string } } } }
 function toEntity(raw: RawEntity): Entity {

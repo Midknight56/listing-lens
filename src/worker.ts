@@ -22,11 +22,22 @@ interface Env extends StageEnv {
 export class DailyCounter extends DurableObject {
   async get(key: string): Promise<number> { return await this.ctx.storage.get<number>(key) ?? 0 }
   async put(key: string, value: number, ttl: number): Promise<void> { await this.ctx.storage.put(key, value); await this.ctx.storage.setAlarm(Date.now() + ttl * 1000) }
+  async take(key: string, cap: number, ttl: number): Promise<boolean> {
+    const allowed = await this.ctx.storage.transaction(async (transaction) => {
+      const current = await transaction.get<number>(key) ?? 0
+      if (current >= cap) return false
+      await transaction.put(key, current + 1)
+      return true
+    })
+    if (allowed) await this.ctx.storage.setAlarm(Date.now() + ttl * 1000)
+    return allowed
+  }
   async alarm(): Promise<void> { await this.ctx.storage.deleteAll() }
   async fetch(request: Request): Promise<Response> {
-    const body = await request.json() as { action?: string; key?: string; value?: number; ttl?: number }
+    const body = await request.json() as { action?: string; key?: string; value?: number; cap?: number; ttl?: number }
     if (!body.key) return Response.json({ error: 'A counter key is required.' }, { status: 400 })
     if (body.action === 'put' && typeof body.value === 'number') await this.put(body.key, body.value, body.ttl ?? 86400)
+    if (body.action === 'take' && typeof body.cap === 'number') return Response.json({ allowed: await this.take(body.key, body.cap, body.ttl ?? 86400) })
     return Response.json({ value: await this.get(body.key) })
   }
 }
@@ -34,6 +45,10 @@ export class DailyCounter extends DurableObject {
 const visitorCounter = (env: Env, key: string) => env.COUNTERS.get(env.COUNTERS.idFromName(key))
 async function count(env: Env, visitor: string, kind: 'fresh' | 'plain'): Promise<boolean> {
   const caps = new VisitorCaps({
+    take: async (key, cap, ttl) => {
+      const response = await visitorCounter(env, 'listing-lens-counters').fetch(new Request('https://counter/take', { method: 'POST', body: JSON.stringify({ action: 'take', key, cap, ttl }) }))
+      return (await response.json() as { allowed: boolean }).allowed
+    },
     get: async (key) => { const response = await visitorCounter(env, 'listing-lens-counters').fetch(new Request('https://counter/get', { method: 'POST', body: JSON.stringify({ key }) })); return (await response.json() as { value: number }).value },
     put: async (key, value, ttl) => { await visitorCounter(env, 'listing-lens-counters').fetch(new Request('https://counter/put', { method: 'POST', body: JSON.stringify({ action: 'put', key, value, ttl }) })) },
   })
@@ -52,6 +67,10 @@ export default {
     const qloo = new QlooClient(env.QLOO_KEY ?? '', fetch, cache, async () => {
       const visitor = request.headers.get('CF-Connecting-IP') ?? 'visitor'
       return (await new VisitorCaps({
+        take: async (key, cap, ttl) => {
+          const response = await visitorCounter(env, 'listing-lens-counters').fetch(new Request('https://counter/take', { method: 'POST', body: JSON.stringify({ action: 'take', key, cap, ttl }) }))
+          return (await response.json() as { allowed: boolean }).allowed
+        },
         get: async (key) => { const res = await visitorCounter(env, 'listing-lens-counters').fetch(new Request('https://counter/get', { method: 'POST', body: JSON.stringify({ key }) })); return (await res.json() as { value: number }).value },
         put: async (key, value, ttl) => { await visitorCounter(env, 'listing-lens-counters').fetch(new Request('https://counter/put', { method: 'POST', body: JSON.stringify({ action: 'put', key, value, ttl }) })) },
       })).qloo(visitor)
