@@ -5,12 +5,15 @@ import {
   catalogVerdicts,
   shortBook,
   run,
+  withCity,
+  readAsCity,
 } from "../../src/agent/run";
 import { composeTemplate } from "../../src/agent/template";
 import { HOME_BRANDS } from "../../src/agent/catalog";
 import { PRESETS, FEATURES, presetsPayload } from "../../src/app/presets";
 import { BoundTextWriter, MODEL_NAME } from "../../src/agent/model";
 import type { Entity } from "../../src/qloo/client";
+import type { Event as StageEvent } from "../../src/agent/events";
 import { scanText } from "../../src/fairhousing";
 
 const cleanDrafts = [
@@ -118,7 +121,7 @@ describe("backend copy and scoring rules", () => {
         },
       },
     );
-    expect(locations.slice(0, 2)).toEqual(["Silver Lake", "Los Angeles"]);
+    expect(locations.slice(0, 2)).toEqual(["Silver Lake, Los Angeles", "Los Angeles"]);
     expect(events.find((event) => event.t === "relax")?.to).toBe("Los Angeles");
     expect(events.find((event) => event.t === "brief")?.scope).toBe(
       "Los Angeles",
@@ -126,6 +129,58 @@ describe("backend copy and scoring rules", () => {
     expect(events.find((event) => event.t === "brief")?.paragraph).toContain(
       "Around Los Angeles",
     );
+  });
+
+  it("sends a neighbourhood with its city and spots an answer for the whole city", async () => {
+    expect(withCity("Hyde Park", "Chicago")).toBe("Hyde Park, Chicago");
+    expect(withCity("Hyde Park Chicago", "Chicago")).toBe("Hyde Park Chicago");
+    expect(readAsCity("Hyde Park", "Hyde Park")).toBe(false);
+    expect(readAsCity("Nashville", "Germantown")).toBe(true);
+    const locations: (string | undefined)[] = [];
+    const events: StageEvent[] = [];
+    const qloo = {
+      search: async () => ({
+        results: [{ id: "ent-test-1301", name: "Sample Anchor", type: "artist", tags: [] }],
+        cached: false,
+      }),
+      insights: async ({ type, location }: { type: string; location?: string }) => {
+        locations.push(location);
+        return {
+          cached: false,
+          locality: { id: "ent-test-1300", name: "Test City", disambiguation: "Test City, Test County" },
+          results: [
+            { id: "ent-test-1302", name: "Sample One", type, tags: [] },
+            { id: "ent-test-1303", name: "Sample Two", type, tags: [] },
+            { id: "ent-test-1304", name: "Sample Three", type, tags: [] },
+          ],
+        };
+      },
+      quotaLeft: async () => 40000,
+    };
+    await run(
+      {
+        city: "Test City",
+        neighbourhood: "Old Quarter",
+        lens: { label: "Design forward", anchors: ["Sample Anchor"] },
+        room: [],
+        features: [],
+      },
+      {
+        qloo: qloo as never,
+        budget: { reserve: async () => null },
+        emit: async (event) => {
+          events.push(event);
+        },
+      },
+    );
+    expect(locations[0]).toBe("Old Quarter, Test City");
+    // No second brand call: the first answer was already the city's.
+    expect(locations[1]).toBe("Old Quarter, Test City");
+    expect(events.find((event) => event.t === "relax")).toMatchObject({
+      to: "Test City",
+      why: "Qloo read Old Quarter as Test City; using Test City",
+    });
+    expect(events.find((event) => event.t === "brief")?.scope).toBe("Test City");
   });
 
   it("shortens book display names and keeps the complete title in detail", () => {

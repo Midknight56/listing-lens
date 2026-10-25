@@ -171,6 +171,19 @@ function normalize(text: string): string {
     .toLocaleLowerCase();
 }
 
+/** "Hyde Park" plus "Chicago" gives "Hyde Park, Chicago"; a name that already holds the city is sent as typed. */
+export function withCity(neighbourhood: string, city: string): string {
+  return normalize(neighbourhood).includes(normalize(city))
+    ? neighbourhood
+    : `${neighbourhood}, ${city}`;
+}
+
+/** True when Qloo resolved the neighbourhood query to a place whose name lacks the neighbourhood's words. */
+export function readAsCity(localityName: string, neighbourhood: string): boolean {
+  const named = new Set(words(normalize(localityName)));
+  return words(normalize(neighbourhood)).some((word) => !named.has(word));
+}
+
 export function wrongCity(disambiguation: string, city: string): boolean {
   const actual = new Set(words(normalize(disambiguation)));
   return words(normalize(city)).some((word) => !actual.has(word));
@@ -378,11 +391,15 @@ export async function run(
       return events;
     }
     let scope = request.neighbourhood || request.city;
+    // Qloo reads a bare neighbourhood name anywhere ("Hyde Park" became Tampa), so it is always sent with its city.
+    let where = request.neighbourhood
+      ? withCity(request.neighbourhood, request.city)
+      : request.city;
     let brandAnswer = await call("/v2/insights", scope, () =>
       deps.qloo.insights({
         seedIds: anchors.map((anchor) => anchor.id),
         type: "brand",
-        location: scope,
+        location: where,
         excludeIds: [],
         take: 10,
       }),
@@ -408,14 +425,29 @@ export async function run(
         why,
       });
       scope = request.city;
+      where = request.city;
       brandAnswer = await call("/v2/insights", scope, () =>
         deps.qloo.insights({
           seedIds: anchors.map((anchor) => anchor.id),
           type: "brand",
-          location: scope,
+          location: where,
           take: 10,
         }),
       );
+    }
+    else if (
+      request.neighbourhood &&
+      brandAnswer.locality &&
+      readAsCity(brandAnswer.locality.name, request.neighbourhood)
+    ) {
+      // Qloo answered for the whole city; the lists are already the city's, so no second call is needed.
+      await emit({
+        t: "relax",
+        from: request.neighbourhood,
+        to: request.city,
+        why: `Qloo read ${request.neighbourhood} as ${request.city}; using ${request.city}`,
+      });
+      scope = request.city;
     }
     if (brandAnswer.results.length < 3 && scope === request.city) {
       await emit({
@@ -425,6 +457,7 @@ export async function run(
         why: `Qloo has thin data for ${scope}; using taste alone`,
       });
       scope = "";
+      where = "";
       brandAnswer = await call("/v2/insights", "all locations", () =>
         deps.qloo.insights({
           seedIds: anchors.map((anchor) => anchor.id),
@@ -455,7 +488,7 @@ export async function run(
       deps.qloo.insights({
         seedIds: anchors.map((anchor) => anchor.id),
         type: "book",
-        location: scope || undefined,
+        location: where || undefined,
         take: 6,
       }),
     );
@@ -463,7 +496,7 @@ export async function run(
       deps.qloo.insights({
         seedIds: anchors.map((anchor) => anchor.id),
         type: "artist",
-        location: scope || undefined,
+        location: where || undefined,
         take: 8,
       }),
     );
@@ -471,7 +504,7 @@ export async function run(
       deps.qloo.insights({
         seedIds: anchors.map((anchor) => anchor.id),
         type: "place",
-        location: scope || undefined,
+        location: where || undefined,
         popularityMax: 0.95,
         take: 6,
       }),
@@ -534,7 +567,7 @@ export async function run(
           deps.qloo.insights({
             seedIds: anchors.map((anchor) => anchor.id),
             type: "brand",
-            location: scope || undefined,
+            location: where || undefined,
             resultIds: ids,
             take: ids.length,
           }),
