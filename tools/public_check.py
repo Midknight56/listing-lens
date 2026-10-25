@@ -80,7 +80,48 @@ def _history_secrets(secrets_dir, patch_text):
                 continue
             if len(value) >= 8 and value[:8] in patch_text:
                 hits.append((path.name, label.strip()))
+        # A bare value on a line of its own (the Qloo key file holds only the key on line 1) has no label to match.
+        for line in content.splitlines():
+            value = line.strip()
+            if re.fullmatch(r"[A-Za-z0-9_-]{20,}", value) and value[:12] in patch_text:
+                hits.append((path.name, "bare value"))
     return hits
+
+
+QLOO_ID = re.compile(r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}")
+DASH = re.compile(r"[–—]|[A-Za-z] - [A-Za-z]")
+
+
+def _qloo_data(patch_text, paths):
+    """Qloo's hackathon guide forbids its response data in a public repo. A Qloo entity id (a UUID) within 400
+    characters of an affinity or popularity field, in any version of any file, or any samples/ folder, fails."""
+    count = sum(1 for path in paths if path.casefold().startswith("samples/") or "/samples/" in path.casefold())
+    added = "\n".join(line[1:] for line in patch_text.splitlines() if line.startswith("+") and not line.startswith("+++"))
+    for match in QLOO_ID.finditer(added):
+        window = added[max(0, match.start() - 400): match.end() + 400].casefold()
+        if "affinity" in window or "popularity" in window:
+            count += 1
+    return count
+
+
+def _dashes():
+    """No dashes between words in public text: the README, the page's HTML and the strings in its scripts."""
+    count = 0
+    for path in [ROOT / "README.md", *sorted((ROOT / "public").glob("**/*.html"))]:
+        if not path.is_file():
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+            if DASH.search(line):
+                print(f"dash: {path.relative_to(ROOT)}:{number}")
+                count += 1
+    for path in sorted((ROOT / "public").glob("**/*.js")):
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for literal in re.findall(r"'([^'\n]*)'|\"([^\"\n]*)\"|`([^`]*)`", text):
+            string = "".join(literal)
+            if DASH.search(string):
+                print(f"dash: {path.relative_to(ROOT)}: {string[:60]}")
+                count += 1
+    return count
 
 
 def _report(name, count):
@@ -142,6 +183,9 @@ def main():
     for filename, label in hits:
         print(f"{filename} {label}")
     checks.append(("secret_values", len(hits)))
+
+    checks.append(("qloo_response_data", _qloo_data(patch_text, paths | set(tracked_paths))))
+    checks.append(("dashes_in_public_text", _dashes()))
 
     license_path = ROOT / "LICENSE"
     license_ok = license_path.is_file() and "MIT" in license_path.open(
