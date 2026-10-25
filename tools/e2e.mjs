@@ -31,8 +31,8 @@ async function calmError(page) {
 async function startPreset(page, presetName = 'East Nashville') {
   const preset = page.locator('.preset-card').filter({ hasText: presetName }).first()
   await preset.waitFor({ timeout: 15000 })
+  // One tap on an example starts its brief; no second button.
   await preset.click()
-  await page.locator('#stage-form button[type="submit"]').click()
 }
 async function clearRoom(page) {
   // Each removal redraws the chips, so always take the first one again.
@@ -124,6 +124,7 @@ async function main() {
     // Bad path: the empty room still returns a complete brief and a no rows note.
     await page.goto(BASE + '/')
     await page.locator('.preset-card').filter({ hasText: 'East Nashville' }).first().click()
+    await page.locator('#listing-paragraph').waitFor({ timeout: 120000 })
     await clearRoom(page)
     await page.locator('#stage-form button[type="submit"]').click()
     await page.locator('#listing-paragraph').waitFor({ timeout: 120000 })
@@ -132,6 +133,7 @@ async function main() {
     // Bad path: the input guard refuses before a run starts.
     await page.goto(BASE + '/')
     await page.locator('.preset-card').filter({ hasText: 'East Nashville' }).first().click()
+    await page.locator('#listing-paragraph').waitFor({ timeout: 120000 })
     await page.locator('.anchor').first().fill('perfect for families')
     await page.locator('#stage-form button[type="submit"]').click()
     const bannedError = await calmError(page)

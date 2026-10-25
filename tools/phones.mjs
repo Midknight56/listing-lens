@@ -84,9 +84,8 @@ async function main() {
       await page.screenshot({ path: `out/phones/${width}-empty.png`, fullPage: false })
       for (const fault of emptyFaults) failures.push(`${width} empty: ${fault}`)
 
+      // One real tap, as a visitor would: the example starts its own brief.
       await page.locator('.preset-card').filter({ hasText: 'East Nashville' }).first().click()
-      await page.locator('#form-details').evaluate((details) => { details.open = true })
-      await page.locator('#stage-form button[type="submit"]').click()
       await page.locator('#listing-paragraph').waitFor({ timeout: 120000 })
       const briefFaults = await measure(page)
       await page.screenshot({ path: `out/phones/${width}-east-nashville.png`, fullPage: false })

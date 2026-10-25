@@ -75,7 +75,8 @@ function drawPresets() {
     const lens = textNode('strong', preset.lens?.label || preset.label || 'A point of view', 'preset-lens');
     const hint = textNode('span', preset.hint || `A brief for ${preset.city || 'your city'}`, 'preset-hint');
     button.append(cityLine, neighbourhoodLine, lens, hint);
-    button.addEventListener('click', () => applyPreset(preset)); presetsNode.append(button);
+    // A tap on an example starts its brief at once: on a phone the form is folded away, so filling it alone looks dead.
+    button.addEventListener('click', () => { applyPreset(preset); form.requestSubmit(); }); presetsNode.append(button);
   });
 }
 function drawLenses() {
