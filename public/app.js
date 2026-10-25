@@ -24,7 +24,6 @@ const plainView = $('#plain-view');
 const briefView = $('#brief-view');
 const featureNode = $('#feature-list');
 const formDetails = $('#form-details');
-const paletteStyle = $('#palette-style');
 
 const FEATURES = ['natural light', 'open kitchen', 'front porch', 'home office', 'garden', 'fireplace', 'hardwood floors', 'walk in closet', 'updated bath', 'big windows', 'high ceilings', 'patio', 'workshop', 'reading nook'];
 let catalogue = { presets: [], lenses: [], features: FEATURES };
@@ -50,8 +49,6 @@ const localPresets = [
 ];
 const runSteps = ['Plan', 'Buyer', 'Place', 'Sections', 'Room', 'Audit', 'Write'];
 
-const palette = new URLSearchParams(location.search).get('palette');
-if (['linen', 'sage', 'harbour', 'walnut'].includes(palette)) { paletteStyle.href = `/palettes/${palette}.css`; paletteStyle.disabled = false; }
 if (matchMedia('(max-width: 899px)').matches) formDetails.open = false;
 
 function markCustom() { if (selectedPreset || selectedPresetData) { selectedPreset = null; selectedPresetData = null; drawPresets(); } }

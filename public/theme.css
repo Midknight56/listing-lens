@@ -1,10 +1,14 @@
+/* The one colour and type file. Every screen reads these names; no other file sets a colour.
+   Sage, chosen by the owner on 25 Oct 2026. Contrast against paper or surface: ink 11.03, muted 5.41,
+   white on accent 6.03, keep 7.23, swap 5.66, cut 6.30 (all at or above 4.5). The page's theme-color meta in
+   index.html repeats --paper, because a meta tag cannot read a CSS name. */
 :root {
-  --ink: #262725;
-  --muted: #62645f;
-  --paper: #f3f3f0;
-  --surface: #ffffff;
-  --line: #d5d6d1;
-  --accent: #343632;
+  --ink: #22382e;
+  --muted: #52665b;
+  --paper: #f0f1e8;
+  --surface: #fbfcf7;
+  --line: #cbd4c8;
+  --accent: #456b54;
   --keep: #e5eee7;
   --keep-ink: #28553a;
   --swap: #f4ecd9;
@@ -13,7 +17,8 @@
   --cut-ink: #813e38;
   --unknown: #eeeeec;
   --unknown-ink: #424440;
-  --focus: #555b50;
+  --focus: #456b54;
+  --shadow: #00000008;
   --font-body: 'DM Sans', Arial, sans-serif;
   --font-display: 'Fraunces', Georgia, serif;
 }
