@@ -9,7 +9,7 @@ describe('Listing Lens render functions', () => {
 
   it('renders audit pills, the raw score and each result section', () => {
     const html = renderBrief([
-      { t: 'audit', rows: [{ name: 'Desk', affinity: 0.90712, verdict: 'keep' }, { name: 'Shelf', verdict: 'unknown' }] },
+      { t: 'audit', rows: [{ name: 'Desk', affinity: 0.90712, verdict: 'keep', better_than: 0.6, of: 30 }, { name: 'Shelf', verdict: 'unknown' }] },
       ...['brands', 'books', 'playlist', 'places'].map((key) => ({ t: 'section', key, items: [
         { name: 'Pick One', affinity: 0.8765, why: 'Because of a love' }, { name: 'Pick Two', affinity: 0.83 }, { name: 'Pick Three', affinity: 0.81 },
       ] })),
@@ -18,6 +18,7 @@ describe('Listing Lens render functions', () => {
     expect(html).toContain('Keep</span>');
     expect(html).toContain('Not in Qloo</span>');
     expect(html).toContain('0.907');
+    expect(html).toContain('Beats 18 of 30 home brands');
     expect(html).toContain('Brands to show');
     expect(html).toContain('Coffee table books');
     expect(html).toContain('Open house playlist');
@@ -58,7 +59,14 @@ describe('Listing Lens render functions', () => {
     expect(html).toContain('data-lens-switch');
     expect(html).toContain('Was Keep');
     expect(html).toContain('score-marker');
-    expect(html).toContain('Using Nashville for this brief');
+    expect(html).toContain('Local data is thin');
+    expect(html).not.toContain('Using Nashville for this brief');
+  });
+
+  it('leaves the empty swap cell blank and explains a cut with no score', () => {
+    const html = renderBrief([{ t: 'audit', rows: [{ name: 'Chair', verdict: 'cut' }] }]);
+    expect(html).toContain('No pull here');
+    expect(html).not.toContain('—');
   });
 
   it('renders lazy thumbnails with a neutral fallback when no image exists', () => {
@@ -95,6 +103,10 @@ describe('Listing Lens render functions', () => {
     expect(html).toContain('Chair Co');
     expect(html).toContain('0.843');
     expect(html).toContain('Not found in this area');
+  });
+
+  it('shows the calm note when an audit has no rows', () => {
+    expect(renderBrief([{ t: 'audit', rows: [] }])).toContain('No brands to audit in this room.');
   });
 
   it('loads a synthetic event stream fixture with made up ids', async () => {

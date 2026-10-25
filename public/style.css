@@ -22,7 +22,8 @@ h3 { font: 600 19px/1.15 var(--font-display); margin-bottom: 8px; }
 .preset-lens { font: 600 17px/1.15 var(--font-display); margin: 4px 0 1px; }
 .preset-hint { font-size: 12px; line-height: 1.35; color: var(--muted); }
 .preset-card[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
-.workspace { display: grid; grid-template-columns: minmax(330px, 380px) minmax(0, 1fr); grid-template-rows: auto 1fr; align-items: start; gap: 0 20px; }
+.workspace { display: grid; min-width: 0; grid-template-columns: minmax(330px, 380px) minmax(0, 1fr); grid-template-rows: auto 1fr; align-items: start; gap: 0 20px; }
+.workspace > *, .presets-panel { min-width: 0; }
 .workspace > .presets-panel { grid-column: 2; grid-row: 1; margin: 0 0 14px; }
 .workspace > .form-details { grid-column: 1; grid-row: 1 / span 2; }
 .workspace > .results-column { grid-column: 2; grid-row: 2; }
@@ -86,6 +87,7 @@ input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--lin
 .verdict.cut { color: var(--cut-ink); background: var(--cut); }
 .verdict.unknown { color: var(--unknown-ink); background: var(--unknown); }
 .score-number { display: block; font-variant-numeric: tabular-nums; font-size: 12px; }
+.beats-note { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
 .score-track { position: relative; display: block; width: 100%; height: 8px; margin: 5px 0; border-radius: 5px; background: var(--line); overflow: visible; }
 .score-fill { display: block; height: 100%; border-radius: inherit; background: var(--score-color, var(--accent)); }
 .score-marker { position: absolute; top: -3px; height: 14px; width: 2px; background: var(--ink); opacity: .65; }
@@ -120,7 +122,7 @@ input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--lin
   .workspace > .presets-panel { margin: 0 0 2px; }
   .preset-row { display: flex; gap: 12px; overflow-x: auto; overflow-y: hidden; padding: 2px 2px 10px; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; }
   .preset-card { flex: 0 0 220px; scroll-snap-align: start; }
-  .workspace { display: flex; flex-direction: column; gap: 12px; }
+  .workspace { display: flex; min-width: 0; flex-direction: column; align-items: stretch; gap: 12px; }
   .form-details, .results-column { position: static; width: 100%; }
   .presets-panel { order: 0; }
   .form-details { order: 1; }

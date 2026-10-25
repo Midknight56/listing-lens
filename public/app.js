@@ -30,6 +30,7 @@ const FEATURES = ['natural light', 'open kitchen', 'front porch', 'home office',
 let catalogue = { presets: [], lenses: [], features: FEATURES };
 let room = [];
 let selectedPreset = null;
+let selectedPresetData = null;
 let requestState = null;
 let activeEvents = [];
 let baselineEvents = null;
@@ -53,7 +54,7 @@ const palette = new URLSearchParams(location.search).get('palette');
 if (['linen', 'sage', 'harbour', 'walnut'].includes(palette)) { paletteStyle.href = `/palettes/${palette}.css`; paletteStyle.disabled = false; }
 if (matchMedia('(max-width: 899px)').matches) formDetails.open = false;
 
-function markCustom() { if (selectedPreset) { selectedPreset = null; drawPresets(); } }
+function markCustom() { if (selectedPreset || selectedPresetData) { selectedPreset = null; selectedPresetData = null; drawPresets(); } }
 function textNode(tag, text, cls) { const node = document.createElement(tag); node.textContent = text; if (cls) node.className = cls; return node; }
 function drawRooms() {
   roomChips.replaceChildren();
@@ -65,8 +66,10 @@ function drawRooms() {
 }
 function drawPresets() {
   presetsNode.replaceChildren();
-  (catalogue.presets.length ? catalogue.presets : localPresets).forEach((preset) => {
+  (catalogue.presets.length ? catalogue.presets : (new URLSearchParams(location.search).has('dev') ? localPresets : [])).forEach((preset) => {
     const button = document.createElement('button'); button.type = 'button'; button.className = 'preset-card'; button.setAttribute('aria-pressed', String(selectedPreset === preset.id));
+    button.dataset.presetId = preset.id || '';
+    button.dataset.presetLabel = preset.label || `${preset.neighbourhood || preset.city || ''}`;
     const cityLine = textNode('span', preset.city || '', 'preset-city');
     const neighbourhoodLine = textNode('span', preset.neighbourhood || 'City wide', 'preset-neighbourhood');
     const lens = textNode('strong', preset.lens?.label || preset.label || 'A point of view', 'preset-lens');
@@ -83,7 +86,7 @@ function drawLenses() {
   });
 }
 function applyPreset(preset) {
-  selectedPreset = preset.id || null; city.value = preset.city || ''; neighbourhood.value = preset.neighbourhood || '';
+  selectedPreset = preset.id || null; selectedPresetData = preset; city.value = preset.city || ''; neighbourhood.value = preset.neighbourhood || '';
   currentLens = preset.lens || null; anchors.forEach((input, i) => { input.value = currentLens?.anchors?.[i] || ''; });
   room = [...(preset.room || [])].slice(0, 6); drawRooms(); drawLenses(); drawPresets();
   const selected = new Set(preset.features || []); featureNode.querySelectorAll('input').forEach((input) => { input.checked = selected.has(input.value); });
@@ -99,8 +102,11 @@ function drawFeatures() {
 async function loadPresets() {
   try { const response = await fetch('/api/presets'); if (!response.ok) throw new Error(); catalogue = { ...catalogue, ...await response.json() }; }
   catch { catalogue = { ...catalogue, presets: [] }; }
-  if (!catalogue.presets.length) catalogue.presets = localPresets;
-  if (!catalogue.lenses.length) catalogue.lenses = [...new Map(localPresets.map((preset) => [preset.lens.label, preset.lens])).values()];
+  if (!catalogue.presets.length && new URLSearchParams(location.search).has('dev')) catalogue.presets = localPresets;
+  if (!catalogue.lenses.length) {
+    const lenses = catalogue.presets.flatMap((preset) => [preset.lens, preset.flip]).filter(Boolean);
+    catalogue.lenses = [...new Map(lenses.map((lens) => [lens.label, lens])).values()];
+  }
   drawPresets(); drawLenses(); drawFeatures();
 }
 function collectRequest() {
@@ -110,7 +116,7 @@ function collectRequest() {
   return { city: city.value.trim(), neighbourhood: neighbourhood.value.trim(), lens, room: [...room], features: selectedFeatures, ...(selectedPreset ? { preset: selectedPreset } : {}) };
 }
 function resetRun() {
-  activeEvents = []; runLines.replaceChildren(); runSummaryNode.textContent = 'Run log'; runLog.open = true; errorBox.hidden = true; errorBox.textContent = '';
+  activeEvents = []; plainEvent = null; plainContent.replaceChildren(); runLines.replaceChildren(); runSummaryNode.textContent = 'Run log'; runLog.open = true; errorBox.hidden = true; errorBox.textContent = '';
   briefContent.innerHTML = '<p class="empty-note">Building the brief…</p>'; modeBadge.hidden = true; diffBox.hidden = true; diffBox.replaceChildren();
 }
 function logEvent(event) {
@@ -142,7 +148,9 @@ function handleEvent(event) {
   if (event.t === 'plain') { plainEvent = event; plainContent.innerHTML = renderPlain(event, activeEvents); }
   if (event.t === 'done') {
     const completedBrief = [...activeEvents].reverse().find((e) => e.t === 'brief');
-    otherLens = catalogue.lenses.find((lens) => lens.label !== (completedBrief?.lens || requestState?.lens?.label)) || null;
+    const activeLens = completedBrief?.lens || requestState?.lens?.label;
+    otherLens = selectedPresetData?.flip?.label !== activeLens ? (selectedPresetData?.flip || null) : null;
+    otherLens ||= catalogue.lenses.find((lens) => lens.label !== activeLens) || null;
     briefContent.innerHTML = renderBrief(activeEvents, otherLens?.label || '', baselineEvents || []); runSummaryNode.textContent = runSummary(activeEvents);
     runLog.open = false;
     shareButton.hidden = !briefId; printButton.hidden = false;
@@ -194,7 +202,7 @@ printButton.addEventListener('click', () => window.print());
 async function flipLens() {
   if (!briefId || !otherLens || busy) return;
   baselineEvents = activeEvents.slice(); const originalRequest = requestState;
-  const flipped = { ...originalRequest, lens: otherLens, ...(selectedPreset ? { preset: selectedPreset } : {}) };
+  const flipped = { ...originalRequest, lens: otherLens };
   requestState = flipped; activeEvents = []; runLines.replaceChildren(); runSummaryNode.textContent = 'Run log'; runLog.open = true;
   await postRun('/api/stage', flipped, { reset: false });
   if (activeEvents.some((event) => event.t === 'done') && baselineEvents) {
@@ -210,9 +218,15 @@ document.querySelectorAll('[data-tab]').forEach((button) => button.addEventListe
   document.querySelectorAll('[data-tab]').forEach((tab) => tab.classList.toggle('active', tab === button));
   briefView.hidden = plain; plainView.hidden = !plain;
   if (plain && briefId && !plainEvent && !busy) {
-    plainContent.textContent = 'Loading picks…';
-    try { const response = await fetch('/api/plain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: briefId }) }); if (!response.ok || !response.body) throw new Error(); await readNdjson(response, handleEvent); }
-    catch { plainContent.textContent = 'Qloo off picks are not available yet.'; }
+    plainContent.textContent = 'Asking the same model with no Qloo';
+    try {
+      const response = await fetch('/api/plain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: briefId }) });
+      if (!response.ok || !response.body) throw new Error();
+      await readNdjson(response, (event) => {
+        if (event.t === 'plain') { plainEvent = event; plainContent.innerHTML = renderPlain(event, activeEvents); }
+        if (event.t === 'error') plainContent.textContent = event.text || 'These picks are not available right now.';
+      });
+    } catch { plainContent.textContent = 'Qloo off picks are not available yet.'; }
   }
 }));
 async function loadShared(id) {

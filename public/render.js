@@ -27,9 +27,9 @@ export function runSummary(events = []) {
   return `${calls} Qloo calls, ${cached} cached`;
 }
 
-function auditHtml(rows = [], priorRows = [], bestPick = null, pickScores = []) {
+function auditHtml(rows = [], priorRows = [], bestPick = null, pickScores = [], present = false) {
   const values = Array.isArray(rows) ? rows : [];
-  if (!values.length) return '';
+  if (!values.length) return present ? '<section class="audit-section"><h2>Room audit</h2><p class="small">No brands to audit in this room.</p></section>' : '';
   const valuesWithScore = values.map((row) => finite(row.affinity)).filter((n) => n !== null);
   const pickValues = (pickScores || []).map(finite).filter((value) => value !== null);
   const allValues = [...valuesWithScore, ...pickValues];
@@ -44,11 +44,14 @@ function auditHtml(rows = [], priorRows = [], bestPick = null, pickScores = []) 
     const marker = Math.max(0, Math.min(100, ((best - low) / span) * 100));
     const swap = row.swap?.name ? `<span class="try-swap">Try ${escapeHtml(row.swap.name)} · ${score(row.swap.affinity)}</span>` : '';
     const was = prior.has(row.name) && prior.get(row.name) !== row.verdict ? `<span class="was-note">Was ${escapeHtml(verdictNames[prior.get(row.name)] || prior.get(row.name))}</span>` : '';
-    const scoreHtml = `<span class="score-track ${verdict}" role="img" aria-label="Affinity ${score(affinity)}"><span class="score-fill" style="width:${width.toFixed(1)}%"></span>${affinity === null ? '' : `<i class="score-marker" style="left:${marker.toFixed(1)}%"></i>`}</span><span class="score-number">${score(affinity)}</span>`;
+    const beats = finite(row.better_than) !== null && finite(row.of) !== null
+      ? `<span class="beats-note">Beats ${Math.round(finite(row.better_than) * finite(row.of))} of ${finite(row.of)} home brands</span>` : '';
+    const rawScore = affinity === null && verdict === 'cut' ? 'No pull here' : score(affinity);
+    const scoreHtml = `<span class="score-track ${verdict}" role="img" aria-label="Affinity ${score(affinity)}"><span class="score-fill" style="width:${width.toFixed(1)}%"></span>${affinity === null ? '' : `<i class="score-marker" style="left:${marker.toFixed(1)}%"></i>`}</span><span class="score-number">${rawScore}</span>${beats}`;
     const pill = `<span class="verdict ${verdict}"><span class="verdict-icon" aria-hidden="true">${verdictIcons[verdict]}</span>${verdictNames[verdict]}</span>`;
     return { name: escapeHtml(row.name), pill, scoreHtml, swap, was };
   };
-  const tableRows = values.map((row) => { const v = rowHtml(row); return `<tr><td>${v.name}${v.was}</td><td>${v.pill}</td><td>${v.scoreHtml}</td><td>${v.swap || '—'}</td></tr>`; }).join('');
+  const tableRows = values.map((row) => { const v = rowHtml(row); return `<tr><td>${v.name}${v.was}</td><td>${v.pill}</td><td>${v.scoreHtml}</td><td>${v.swap}</td></tr>`; }).join('');
   const cards = values.map((row) => { const v = rowHtml(row); return `<article class="audit-card"><div class="audit-card-top"><span class="audit-card-name">${v.name}${v.was}</span>${v.pill}</div>${v.scoreHtml}${v.swap}</article>`; }).join('');
   return `<section class="audit-section"><h2>Room audit</h2><table class="audit-table"><thead><tr><th>In the room</th><th>Call</th><th>Affinity</th><th>Try instead</th></tr></thead><tbody>${tableRows}</tbody></table><div class="audit-cards">${cards}</div><p class="small">Score scale ${score(low)} to ${score(best)}</p></section>`;
 }
@@ -83,8 +86,8 @@ export function renderBrief(events = [], otherLens = '', priorEvents = []) {
   const scopeHeader = scope ? `<p class="scope-line">${escapeHtml(scope)}${from}</p>` : '';
   const lensSwitch = brief.lens ? `<div class="lens-segment" aria-label="Choose a lens"><span class="current">${escapeHtml(brief.lens)}</span>${otherLens ? `<button type="button" data-lens-switch>${escapeHtml(otherLens)}</button>` : ''}</div>` : '';
   const header = `<header class="result-header">${scopeHeader}<p class="header-lens">${escapeHtml(brief.lens || 'Listing brief')}</p><span class="header-mode">${escapeHtml(modeLabel(run))}</span></header>`;
-  const notice = relax ? `<p class="run-notice">Using ${escapeHtml(relax.to)} for this brief</p>` : '';
-  const content = `${header}${notice}${lensSwitch}${auditHtml(audit.rows, priorAudit, Number.isFinite(bestPick) ? bestPick : null, brandPicks.map((item) => item.affinity))}${keys.map((key) => cardsHtml(sections.get(key) || { key, items: [], thin: true })).join('')}${brief.intro ? `<p class="brief-intro">${escapeHtml(brief.intro)}</p>` : ''}${brief.paragraph ? `<section class="listing-copy"><h2>Listing paragraph</h2><p id="listing-paragraph" class="paragraph">${escapeHtml(brief.paragraph)}</p><div class="action-row"><button type="button" data-copy-paragraph>Copy</button><span class="small">Written by ${brief.written_by === 'model' ? 'model' : 'template'}</span></div></section>` : ''}`;
+  const notice = relax?.why ? `<p class="run-notice">${escapeHtml(relax.why)}</p>` : '';
+  const content = `${header}${notice}${lensSwitch}${auditHtml(audit.rows, priorAudit, Number.isFinite(bestPick) ? bestPick : null, brandPicks.map((item) => item.affinity), Boolean(audit.rows))}${keys.map((key) => cardsHtml(sections.get(key) || { key, items: [], thin: true })).join('')}${brief.intro ? `<p class="brief-intro">${escapeHtml(brief.intro)}</p>` : ''}${brief.paragraph ? `<section class="listing-copy"><h2>Listing paragraph</h2><p id="listing-paragraph" class="paragraph">${escapeHtml(brief.paragraph)}</p><div class="action-row"><button type="button" data-copy-paragraph>Copy</button><span class="small">Written by ${brief.written_by === 'model' ? 'model' : 'template'}</span></div></section>` : ''}`;
   return content || '<p class="empty-note">Choose a preset or enter a place to begin.</p>';
 }
 
