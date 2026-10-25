@@ -1,0 +1,5 @@
+:root {
+  --ink: #f4ead8; --muted: #c6b79f; --paper: #28231e; --surface: #342d25; --line: #655848; --accent: #d39a43;
+  --keep: #244435; --keep-ink: #b9e0c7; --swap: #544523; --swap-ink: #f0d485; --cut: #552f2d; --cut-ink: #ffc0b8; --unknown: #454039; --unknown-ink: #eee6d8; --focus: #e6b75d;
+  --font-body: 'DM Sans', Arial, sans-serif; --font-display: 'Fraunces', Georgia, serif;
+}

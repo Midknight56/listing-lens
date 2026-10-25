@@ -1,0 +1,24 @@
+{"t":"run","id":"brief-test-0001","mode":"replay","recorded_at":"2026-10-25"}
+{"t":"plan","budget":16,"steps":["resolve buyer","place and brands","books, playlist, places","room","audit","write"]}
+{"t":"call","n":1,"path":"/search","what":"Studio K","cached":false,"ms":18,"count":1}
+{"t":"resolved","kind":"anchor","name":"Studio K","as":"Studio K (brand)","id":"ent-test-0001"}
+{"t":"call","n":2,"path":"/search","what":"Paper Moon","cached":false,"ms":16,"count":1}
+{"t":"resolved","kind":"anchor","name":"Paper Moon","as":"Paper Moon (book)","id":"ent-test-0002"}
+{"t":"call","n":3,"path":"/search","what":"Harbor Radio","cached":false,"ms":14,"count":1}
+{"t":"resolved","kind":"anchor","name":"Harbor Radio","as":"Harbor Radio (artist)","id":"ent-test-0003"}
+{"t":"call","n":4,"path":"/v2/insights","what":"Halifax place and brands","cached":false,"ms":22,"count":5}
+{"t":"call","n":5,"path":"/v2/insights","what":"coffee table books","cached":false,"ms":19,"count":3}
+{"t":"call","n":6,"path":"/v2/insights","what":"open house playlist","cached":false,"ms":17,"count":3}
+{"t":"call","n":7,"path":"/v2/insights","what":"local favourites","cached":false,"ms":17,"count":3}
+{"t":"call","n":8,"path":"/search","what":"brands already in the room","cached":false,"ms":21,"count":4}
+{"t":"relax","from":"North End","to":"Halifax","why":"Local data is thin for North End"}
+{"t":"resolved","kind":"scope","name":"Halifax","as":"Halifax, Nova Scotia","id":"ent-test-0004"}
+{"t":"section","key":"brands","items":[{"id":"ent-test-0010","name":"Northline Studio","type":"brand","affinity":0.912,"why":"Because they love Studio K (62%)","anchor":"Studio K","share":0.62},{"id":"ent-test-0011","name":"Field House","type":"brand","affinity":0.889,"why":"Because they love Paper Moon (58%)"},{"id":"ent-test-0012","name":"Maple Works","type":"brand","affinity":0.851,"why":"Because they love Harbor Radio (51%)"}]}
+{"t":"section","key":"books","items":[{"id":"ent-test-0020","name":"Quiet Rooms","type":"book","affinity":0.82,"why":"Because they love Paper Moon (60%)"},{"id":"ent-test-0021","name":"Coast and Color","type":"book","affinity":0.8,"why":"Because they love Studio K (54%)"},{"id":"ent-test-0022","name":"Useful Spaces","type":"book","affinity":0.77,"why":"Because they love Harbor Radio (49%)"}]}
+{"t":"section","key":"playlist","items":[{"id":"ent-test-0030","name":"Soft Weather","type":"artist","affinity":0.88,"why":"Because they love Harbor Radio (64%)"},{"id":"ent-test-0031","name":"Sunday Static","type":"artist","affinity":0.84,"why":"Because they love Studio K (55%)"},{"id":"ent-test-0032","name":"Small Hours","type":"artist","affinity":0.8,"why":"Because they love Paper Moon (48%)"}]}
+{"t":"section","key":"places","items":[{"id":"ent-test-0040","name":"Harbor Coffee","type":"place","affinity":0.86,"why":"Popular with people in Halifax who share this taste"},{"id":"ent-test-0041","name":"Cedar Market","type":"place","affinity":0.82,"why":"Popular with people in Halifax who share this taste"},{"id":"ent-test-0042","name":"The Reading Room","type":"place","affinity":0.78,"why":"Popular with people in Halifax who share this taste"}]}
+{"t":"audit","rows":[{"name":"Northline Studio","id":"ent-test-0010","affinity":0.912,"verdict":"keep"},{"name":"Maple Works","id":"ent-test-0012","affinity":0.851,"verdict":"swap","swap":{"id":"ent-test-0011","name":"Field House","affinity":0.889}},{"name":"Old Harbor Co","id":"ent-test-0013","affinity":0.733,"verdict":"cut","swap":{"id":"ent-test-0011","name":"Field House","affinity":0.889}},{"name":"Unknown Label","verdict":"unknown"}]}
+{"t":"brief","intro":"A calm coastal palette with useful pieces and room to breathe.","paragraph":"Natural light and hardwood floors give this Halifax home a bright, grounded feel. Nearby independent shops and a welcoming coffee stop add local character.","written_by":"template","scope":"Halifax, Nova Scotia","lens":"Design forward"}
+{"t":"fallback","what":"paragraph","why":"template used for sample"}
+{"t":"usage","qloo_upstream":8,"qloo_cached":2,"neurons":0}
+{"t":"done"}
