@@ -184,6 +184,15 @@ function normalize(text: string): string {
 }
 
 /** "Hyde Park" plus "Chicago" gives "Hyde Park, Chicago"; a name that already holds the city is sent as typed. */
+/** What a visitor reads when a run stops. Qloo's own wording is translated; any other fault stays private. */
+export function visitorMessage(error: unknown): string {
+  if (!(error instanceof QlooError)) return "The brief could not be completed. Try an example below.";
+  if (/unable to resolve to a valid locality/i.test(error.message)) {
+    return "That place was not found. Check the city name or try an example below.";
+  }
+  return error.message;
+}
+
 export function withCity(neighbourhood: string, city: string): string {
   return normalize(neighbourhood).includes(normalize(city))
     ? neighbourhood
@@ -710,13 +719,7 @@ export async function run(
     });
   } catch (error) {
     deps.setMode?.("off");
-    const message =
-      error instanceof QlooError
-        ? error.message
-        : error instanceof Error
-          ? error.message
-          : "The brief could not be completed.";
-    await emit({ t: "error", text: message });
+    await emit({ t: "error", text: visitorMessage(error) });
   }
   return events;
 }

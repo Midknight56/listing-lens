@@ -8,6 +8,8 @@ import {
 import type { TextReply } from "../../src/agent/model";
 import { unknownName } from "../../src/agent/run";
 import { ideas, PLAIN_PROMPT } from "../../src/app/plain";
+import { visitorMessage } from "../../src/agent/run";
+import { QlooBusy, QlooError } from "../../src/qloo/client";
 
 const entity = (id: string, name: string, type: string, detail?: string) => ({
   id,
@@ -175,5 +177,14 @@ describe("plain picks", () => {
       ideas(echo, ["Test City", "Herman Miller", "Kinfolk", "Khruangbin", "IKEA", "West Elm", "Pottery Barn", "CB2"]),
     ).toBeNull();
     expect(PLAIN_PROMPT).toContain("Do not repeat");
+  });
+});
+
+describe("visitor messages", () => {
+  it("says a place was not found in plain words and keeps other faults private", () => {
+    const unresolved = new QlooError("Qloo said: signal.location.query is unable to resolve to a valid locality.");
+    expect(visitorMessage(unresolved)).toBe("That place was not found. Check the city name or try an example below.");
+    expect(visitorMessage(new Error("D1_ERROR: no such table: briefs"))).not.toContain("D1");
+    expect(visitorMessage(new QlooBusy())).toContain("limit");
   });
 });
