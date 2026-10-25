@@ -170,3 +170,32 @@ describe("Qloo request shapes", () => {
     ]);
   });
 });
+
+describe("Qloo rate limit", () => {
+  it("retries a 429 once after a pause and counts the call once", async () => {
+    const answers = [new Response("", { status: 429 }), Response.json(fixture)];
+    const fetcher = vi.fn(async () => answers.shift()!);
+    const allow = vi.fn(async () => true);
+    const pauses: number[] = [];
+    const client = new QlooClient("test-key", fetcher, new MemoryCache(), allow, async (ms) => {
+      pauses.push(ms);
+    });
+    const answer = await client.insights({ seedIds: ["ent-test-0003"], type: "brand" });
+    expect(answer.results).toHaveLength(1);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(allow).toHaveBeenCalledTimes(1);
+    expect(pauses).toContain(1100);
+  });
+
+  it("spaces two upstream calls at least 120 ms apart", async () => {
+    const fetcher = vi.fn(async () => Response.json(fixture));
+    const pauses: number[] = [];
+    const client = new QlooClient("test-key", fetcher, new MemoryCache(), async () => true, async (ms) => {
+      pauses.push(ms);
+    });
+    await client.insights({ seedIds: ["ent-test-0003"], type: "brand" });
+    await client.insights({ seedIds: ["ent-test-0004"], type: "brand" });
+    expect(pauses.length).toBe(1);
+    expect(pauses[0]).toBeGreaterThan(100);
+  });
+});

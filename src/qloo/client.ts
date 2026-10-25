@@ -1,4 +1,8 @@
 export const QLOO_BASE = "https://hackathon.api.qloo.com";
+/** 10 calls a second is the key's limit; 120 ms apart keeps one run at about 8 a second. */
+export const MIN_GAP_MS = 120;
+/** The per second window resets after 1 s (X-Second-RateLimit-Reset: 1), so a retry waits a little longer. */
+export const RATE_RETRY_MS = 1100;
 export const ENTITY_TYPES = [
   "artist",
   "book",
@@ -110,11 +114,16 @@ function toEntity(raw: RawEntity): Entity {
 }
 
 export class QlooClient {
+  private lastSent = 0;
+
   constructor(
     private key: string,
     private fetcher: typeof fetch,
     private cache: Cache,
     private allow: () => Promise<boolean>,
+    /** Waits; tests pass a no-op so they run at full speed. */
+    private pause: (ms: number) => Promise<void> = (ms) =>
+      new Promise((resolve) => setTimeout(resolve, ms)),
   ) {}
 
   async search(
@@ -178,6 +187,25 @@ export class QlooClient {
     };
   }
 
+  /** One upstream request, spaced at least MIN_GAP_MS after the last one from this client. */
+  private async send(url: string): Promise<Response> {
+    const wait = this.lastSent + MIN_GAP_MS - Date.now();
+    if (wait > 0) await this.pause(wait);
+    this.lastSent = Date.now();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      return await this.fetcher(QLOO_BASE + url, {
+        headers: { "X-Api-Key": this.key, Accept: "application/json" },
+        signal: controller.signal,
+      });
+    } catch {
+      throw new QlooError("Live results are not answering right now.");
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async quotaLeft(): Promise<number | null> {
     return this.cache.quotaLeft?.() ?? null;
   }
@@ -202,18 +230,12 @@ export class QlooClient {
       throw new QlooBusy();
     }
     if (!(await this.allow())) throw new QlooBusy();
-    let response: Response;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
-    try {
-      response = await this.fetcher(QLOO_BASE + url, {
-        headers: { "X-Api-Key": this.key, Accept: "application/json" },
-        signal: controller.signal,
-      });
-    } catch {
-      throw new QlooError("Live results are not answering right now.");
-    } finally {
-      clearTimeout(timer);
+    let response = await this.send(url);
+    // The key allows 10 calls a second (X-Second-RateLimit-Limit, read 25 Oct 2026) and three apps share it, so a
+    // 429 gets one more try after the second has rolled over. The retry is not counted twice against the caps.
+    if (response.status === 429) {
+      await this.pause(RATE_RETRY_MS);
+      response = await this.send(url);
     }
     const quotaHeader = response.headers.get("X-Month-RateLimit-Remaining");
     const remaining = Number(quotaHeader);
