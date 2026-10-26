@@ -318,6 +318,30 @@ export function catalogVerdicts(
   });
 }
 
+// Staging keeps a house neutral: a coffee table book about politics, faith or who a person is reads as a message about
+// who should live there. Qloo's own tags decide; one matching tag drops the book.
+const OFF_SHELF = new RegExp(
+  `\\b(${[
+    "politic\\w*", "activism", "social (justice|issues)", "presidents",
+    "religio\\w*", "christian\\w*", "bible", "faith", "theology", "spiritual\\w*", "islam\\w*", "jewish", "judaism",
+    "race", "racism", "anti racist", "african american", "lgbt\\w*", "queer", "feminis\\w*", "gender",
+    "disabilit\\w*", "autis\\w*", "mental health", "parenting", "children\\w*", "family",
+  ].join("|")})\\b`,
+  "i",
+);
+
+// Coffee table genres, and the genres kept off the table, as Qloo tag ids (each checked with /v2/tags, 26 Oct 2026).
+// Many books come back with no tags in the answer, so Qloo applies these lists itself; shelfSafe is a second look.
+const GENRE = "urn:tag:genre:media:";
+export const SHELF_TAGS = ["design", "architecture", "art", "photography", "travel", "food", "cooking", "nature",
+  "gardening", "fashion"].map((tag) => GENRE + tag);
+export const OFF_SHELF_TAGS = ["politics", "history_politics", "religion", "religion_spirituality", "race", "lgbt",
+  "parenting"].map((tag) => GENRE + tag);
+
+export function shelfSafe(entity: Entity): boolean {
+  return !entity.tags.some((tag) => OFF_SHELF.test(tag));
+}
+
 export function shortBook(entity: Entity): Entity {
   if (entity.type !== "book") return entity;
   const full = entity.name;
@@ -506,13 +530,23 @@ export async function run(
       items: brands,
       ...(brands.length < 3 ? { thin: true as const } : {}),
     });
-    const books = await call("/v2/insights", "books", () =>
-      deps.qloo.insights({
-        seedIds: anchors.map((anchor) => anchor.id),
-        type: "book",
-        location: where || undefined,
-        take: 6,
-      }),
+    // Qloo has almost no book taste below the city (Wicker Park and Silver Lake gave 0, 26 Oct), and a book is not
+    // local, so books are always asked for the city. Twelve are asked for so six remain after the shelf filter.
+    const shelf = (answer: Awaited<ReturnType<typeof call>>) => ({
+      ...answer,
+      results: answer.results.filter(shelfSafe).slice(0, 6),
+    });
+    const books = shelf(
+      await call("/v2/insights", "books", () =>
+        deps.qloo.insights({
+          seedIds: anchors.map((anchor) => anchor.id),
+          type: "book",
+          location: (scope === request.neighbourhood ? request.city : where) || undefined,
+          tags: SHELF_TAGS,
+          excludeTags: OFF_SHELF_TAGS,
+          take: 12,
+        }),
+      ),
     );
     const artists = await call("/v2/insights", "playlist", () =>
       deps.qloo.insights({
@@ -531,7 +565,7 @@ export async function run(
         take: 6,
       }),
     );
-    // One list can be empty in a neighbourhood while the city has plenty (Wicker Park had no books, 26 Oct). Ask that
+    // One list can be empty in a neighbourhood while the city has plenty (as books were, 26 Oct). Ask that
     // list again for the city, but only while the room's searches and the audit still fit in the call limit.
     const widened = new Set<string>();
     const widen = async (
@@ -562,7 +596,6 @@ export async function run(
       widened.add(key);
       return wide;
     };
-    const bookList = await widen("books", "book", books, {}, 6);
     const artistList = await widen("playlist", "artist", artists, {}, 8);
     const placeList = await widen("places", "place", places, { popularityMax: 0.95 }, 6);
     const localPlaces = placeList.results.filter(
@@ -572,7 +605,7 @@ export async function run(
         ),
     );
     const sections = [
-      { key: "books" as const, items: bookList.results.map(shortBook) },
+      { key: "books" as const, items: books.results.map(shortBook) },
       { key: "playlist" as const, items: artistList.results },
       { key: "places" as const, items: localPlaces },
     ];

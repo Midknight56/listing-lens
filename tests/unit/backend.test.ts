@@ -7,6 +7,7 @@ import {
   run,
   withCity,
   readAsCity,
+  shelfSafe,
 } from "../../src/agent/run";
 import { composeTemplate } from "../../src/agent/template";
 import { HOME_BRANDS } from "../../src/agent/catalog";
@@ -198,7 +199,7 @@ describe("backend copy and scoring rules", () => {
       }),
       insights: async ({ type, location }: { type: string; location?: string }) => {
         asked.push(`${type} @ ${location}`);
-        const empty = type === "book" && location === "Wicker Park, Chicago";
+        const empty = type === "artist" && location === "Wicker Park, Chicago";
         return {
           cached: false,
           locality: { id: "ent-test-1400", name: location ?? "", disambiguation: "Wicker Park, Chicago, Illinois" },
@@ -223,16 +224,76 @@ describe("backend copy and scoring rules", () => {
         },
       },
     );
-    expect(asked).toContain("book @ Chicago");
-    // Only the empty list goes wide; the others stay in the neighbourhood.
-    expect(asked).not.toContain("artist @ Chicago");
-    const books = events.find((event) => event.t === "section" && event.key === "books");
-    expect(books).toMatchObject({ from: "Chicago" });
-    expect(books && "items" in books ? books.items : []).toHaveLength(3);
+    expect(asked).toContain("artist @ Chicago");
+    // Only the empty list goes wide; places stay in the neighbourhood. Books are always the city's, with no note.
+    expect(asked).not.toContain("place @ Chicago");
+    expect(asked.filter((line) => line.startsWith("book @"))).toEqual(["book @ Chicago"]);
+    const playlist = events.find((event) => event.t === "section" && event.key === "playlist");
+    expect(playlist).toMatchObject({ from: "Chicago" });
+    expect(playlist && "items" in playlist ? playlist.items : []).toHaveLength(3);
+    expect(events.find((event) => event.t === "section" && event.key === "books")).not.toHaveProperty("from");
     expect(events.some((event) => event.t === "error")).toBe(false);
     // A full room still gets its audit inside the 16 call limit.
     expect(events.filter((event) => event.t === "call")).toHaveLength(15);
     expect(events.find((event) => event.t === "brief")?.scope).toBe("Wicker Park");
+  });
+
+  it("keeps political, religious and identity books off the coffee table", async () => {
+    const book = (name: string, tags: string[]): Entity => ({ id: `ent-test-15${name.length}`, name, type: "book", tags });
+    expect(shelfSafe(book("Rooms of Light", ["Design", "Architecture", "Nonfiction"]))).toBe(true);
+    for (const tags of [["Audiobook", "Politics"], ["Political Science"], ["Religion"], ["Christian Living"], ["LGBT"],
+      ["Queer"], ["Race"], ["Anti Racist"], ["Disability"], ["Parenting"], ["Social Justice"], ["Feminism"]]) {
+      expect(shelfSafe(book("A Sample Title", tags)), tags.join(",")).toBe(false);
+    }
+    const asked: { type: string; take?: number; tags?: string[]; excludeTags?: string[] }[] = [];
+    const events: StageEvent[] = [];
+    const qloo = {
+      search: async (query: string) => ({
+        results: [{ id: "ent-test-1501", name: query, type: "brand", tags: [] }],
+        cached: false,
+      }),
+      insights: async (opts: { type: string; take?: number; tags?: string[]; excludeTags?: string[] }) => {
+        const { type } = opts;
+        asked.push(opts);
+        const results: Entity[] =
+          type === "book"
+            ? [
+                book("Political Revolution", ["Memoir", "Politics"]),
+                book("Garden Rooms", ["Design", "Gardening"]),
+                book("Faith At Home", ["Religion"]),
+                book("Paper Lanterns", ["Art"]),
+                book("Open Kitchens", ["Cooking", "Design"]),
+              ]
+            : [1, 2, 3].map((n) => ({ id: `ent-test-16${n}0`, name: `Sample ${n}`, type, tags: [] }));
+        return { cached: false, locality: null, results };
+      },
+      quotaLeft: async () => 40000,
+    };
+    await run(
+      {
+        city: "Test City",
+        lens: { label: "Design forward", anchors: ["One"] },
+        room: [],
+        features: [],
+      },
+      {
+        qloo: qloo as never,
+        budget: { reserve: async () => null },
+        emit: async (event) => {
+          events.push(event);
+        },
+      },
+    );
+    const bookCall = asked.find((call) => call.type === "book");
+    expect(bookCall?.take).toBe(12);
+    expect(bookCall?.tags).toContain("urn:tag:genre:media:design");
+    expect(bookCall?.excludeTags).toEqual(expect.arrayContaining(["urn:tag:genre:media:politics", "urn:tag:genre:media:race"]));
+    const books = events.find((event) => event.t === "section" && event.key === "books");
+    expect(books && "items" in books ? books.items.map((item) => item.name) : []).toEqual([
+      "Garden Rooms",
+      "Paper Lanterns",
+      "Open Kitchens",
+    ]);
   });
 
   it("shortens book display names and keeps the complete title in detail", () => {

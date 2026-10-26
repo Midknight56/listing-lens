@@ -89,7 +89,8 @@ function toEntity(raw: RawEntity): Entity {
     tags: (raw.tags ?? [])
       .map((tag) => tag.name ?? "")
       .filter(Boolean)
-      .slice(0, 5),
+      // Kept long enough for the book shelf filter, which reads every tag; tags never reach the page.
+      .slice(0, 25),
   };
   if (typeof raw.query?.affinity === "number")
     entity.affinity = Math.round(raw.query.affinity * 1000) / 1000;
@@ -151,6 +152,8 @@ export class QlooClient {
     excludeIds?: string[];
     resultIds?: string[];
     popularityMax?: number;
+    tags?: string[];
+    excludeTags?: string[];
   }): Promise<Answer<Entity>> {
     const params: Record<string, string> = {
       "filter.type": "urn:entity:" + opts.type,
@@ -170,6 +173,9 @@ export class QlooClient {
       params["filter.results.entities"] = opts.resultIds.join(",");
     if (opts.popularityMax !== undefined)
       params["filter.popularity.max"] = String(opts.popularityMax);
+    if (opts.tags?.length) params["filter.tags"] = opts.tags.join(",");
+    if (opts.excludeTags?.length)
+      params["filter.exclude.tags"] = opts.excludeTags.join(",");
     const { body, cached } = await this.get("/v2/insights", params);
     const results = body.results as { entities?: RawEntity[] } | undefined;
     const rawLocality = body.query?.localities?.signal;
