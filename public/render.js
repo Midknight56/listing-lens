@@ -49,7 +49,8 @@ function auditHtml(rows = [], priorRows = [], bestPick = null, pickScores = [], 
     const was = prior.has(row.name) && prior.get(row.name) !== row.verdict ? `<span class="was-note">Was ${escapeHtml(verdictNames[prior.get(row.name)] || prior.get(row.name))}</span>` : '';
     const beats = finite(row.better_than) !== null && finite(row.of) !== null
       ? `<span class="beats-note">Beats ${Math.round(finite(row.better_than) * finite(row.of))} of ${finite(row.of)} home brands</span>` : '';
-    const rawScore = affinity === null && verdict === 'cut' ? 'No pull here' : score(affinity);
+    const reason = typeof row.reason === 'string' && row.reason ? row.reason[0].toUpperCase() + row.reason.slice(1) : '';
+    const rawScore = affinity === null && reason ? escapeHtml(reason) : affinity === null && verdict === 'cut' ? 'No pull here' : score(affinity);
     const scoreHtml = `<span class="score-track ${verdict}" role="img" aria-label="Affinity ${score(affinity)}"><span class="score-fill" style="width:${width.toFixed(1)}%"></span>${affinity === null ? '' : `<i class="score-marker" style="left:${marker.toFixed(1)}%"></i>`}</span><span class="score-number">${rawScore}</span>${beats}`;
     const pill = `<span class="verdict ${verdict}"><span class="verdict-icon" aria-hidden="true">${verdictIcons[verdict]}</span>${verdictNames[verdict]}</span>`;
     return { name: escapeHtml(row.name), pill, scoreHtml, swap, was };

@@ -211,9 +211,19 @@ export function wrongCity(disambiguation: string, city: string): boolean {
   return words(normalize(city)).some((word) => !actual.has(word));
 }
 
+// Qloo never returns a seed as its own result, so a room brand that is one of the buyer's loves has no score. It is
+// kept for that plain reason, with no made up score, rank or swap.
+const loveRow = (row: { name: string; id?: string }): AuditRow => ({
+  name: row.name,
+  ...(row.id ? { id: row.id } : {}),
+  verdict: "keep",
+  reason: "one of their loves",
+});
+
 function legacyVerdicts(
   picks: Pick[],
   rows: { name: string; id?: string; affinity?: number }[],
+  loves: Set<string> = new Set(),
 ): AuditRow[] {
   const scored = picks
     .filter((pick) => typeof pick.affinity === "number")
@@ -223,6 +233,7 @@ function legacyVerdicts(
   const offered = new Set<string>();
   return rows.map((row) => {
     if (!row.id) return { name: row.name, verdict: "unknown" };
+    if (loves.has(row.id)) return loveRow(row);
     const affinity = row.affinity ?? 0;
     const gap = Math.round((top - affinity) * 1000) / 1000;
     const verdict =
@@ -261,6 +272,7 @@ export function catalogVerdicts(
   catalog: Entity[],
   rows: { name: string; id?: string }[],
   roomScores: Entity[],
+  loves: Set<string> = new Set(),
 ): AuditRow[] {
   const ranked = catalog
     .filter((item) => typeof item.affinity === "number")
@@ -276,6 +288,7 @@ export function catalogVerdicts(
         of: ranked.length,
       };
     }
+    if (loves.has(row.id)) return loveRow(row);
     const scored = roomScores.find((item) => item.id === row.id);
     if (!scored || typeof scored.affinity !== "number") {
       return {
@@ -669,6 +682,7 @@ export async function run(
           }),
         )
       : { results: [], cached: true };
+    const loveIds = new Set(anchors.map((anchor) => anchor.id));
     const scoredRoom = auditResult.results.filter((item) =>
       roomIds.includes(item.id),
     );
@@ -679,6 +693,7 @@ export async function run(
           ),
           roomHits,
           scoredRoom,
+          loveIds,
         )
       : legacyVerdicts(
           brands,
@@ -692,6 +707,7 @@ export async function run(
                     .affinity,
                 }),
           })),
+          loveIds,
         );
     await emit({ t: "audit", rows });
     const baseFacts = {

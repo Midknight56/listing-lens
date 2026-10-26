@@ -238,6 +238,43 @@ describe("backend copy and scoring rules", () => {
     expect(events.find((event) => event.t === "brief")?.scope).toBe("Wicker Park");
   });
 
+  it("keeps a room brand that is one of the buyer's loves, since Qloo never scores a seed", async () => {
+    const events: StageEvent[] = [];
+    const id = (name: string) => `ent-love-${name.toLowerCase().replace(/[^a-z]/g, "")}`;
+    const catalog: Entity[] = Array.from({ length: 12 }, (_, i) => ({
+      id: `ent-love-cat${i}`, name: `Home ${i}`, type: "brand", affinity: 0.9 + i / 1000, tags: [],
+    }));
+    const qloo = {
+      search: async (query: string) => ({ results: [{ id: id(query), name: query, type: "brand", tags: [] }], cached: false }),
+      insights: async ({ type, seedIds = [], resultIds }: { type: string; seedIds?: string[]; resultIds?: string[] }) => ({
+        cached: false,
+        locality: null,
+        // Like Qloo: the seeds never come back as their own results.
+        results: resultIds
+          ? [...catalog, { id: id("IKEA"), name: "IKEA", type, affinity: 0.95, tags: [] }]
+              .filter((item) => resultIds.includes(item.id) && !seedIds.includes(item.id))
+          : [{ id: `ent-love-${type}`, name: `A ${type}`, type, affinity: 0.9, tags: [] }],
+      }),
+      quotaLeft: async () => 40000,
+    };
+    await run(
+      {
+        city: "Chicago",
+        lens: { label: "Classic comfort", anchors: ["Pottery Barn", "Martha Stewart Living", "Norah Jones"] },
+        room: ["Pottery Barn", "IKEA"],
+        features: [],
+      },
+      { qloo: qloo as never, catalog, budget: { reserve: async () => null }, emit: async (event) => { events.push(event); } },
+    );
+    const audit = events.find((event) => event.t === "audit");
+    const rows = audit && "rows" in audit ? audit.rows : [];
+    expect(rows[0]).toMatchObject({ name: "Pottery Barn", verdict: "keep", reason: "one of their loves" });
+    // No made up score or rank for a love, and no swap spent on it.
+    expect(rows[0]).not.toHaveProperty("better_than");
+    expect(rows[0]).not.toHaveProperty("swap");
+    expect(rows[1]).toMatchObject({ name: "IKEA", verdict: "keep" });
+  });
+
   it("keeps political, religious and identity books off the coffee table", async () => {
     const book = (name: string, tags: string[]): Entity => ({ id: `ent-test-15${name.length}`, name, type: "book", tags });
     expect(shelfSafe(book("Rooms of Light", ["Design", "Architecture", "Nonfiction"]))).toBe(true);

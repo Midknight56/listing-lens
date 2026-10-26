@@ -75,6 +75,13 @@ describe('Staging Brief render functions', () => {
     expect(html).not.toContain('—');
   });
 
+  it('says a kept room brand is one of the buyer loves, with no score or rank', () => {
+    const html = renderBrief([{ t: 'audit', rows: [{ name: 'Pottery Barn', verdict: 'keep', reason: 'one of their loves' }] }]);
+    expect(html).toContain('One of their loves');
+    expect(html).not.toContain('No pull here');
+    expect(html).not.toContain('Beats');
+  });
+
   it('renders lazy thumbnails, and no empty box when a pick has no image', () => {
     const html = renderBrief([{ t: 'section', key: 'brands', items: [
       { name: 'A', affinity: 0.9, image: 'https://images.example.invalid/a.jpg' },

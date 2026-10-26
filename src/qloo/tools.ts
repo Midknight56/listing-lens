@@ -165,6 +165,7 @@ export const auditRoom: Tool<QlooContext> = {
             ),
             room,
             answer.results.filter((entity) => ids.includes(entity.id)),
+            new Set(args.anchors as string[]),
           )
         : verdicts(
             candidates.results.map((entity) => ({
@@ -185,6 +186,7 @@ export const auditRoom: Tool<QlooContext> = {
                     )!.affinity,
                   }),
             })),
+            new Set(args.anchors as string[]),
           );
       return {
         content: [{ type: "text", text: JSON.stringify(rows) }],
