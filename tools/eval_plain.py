@@ -51,13 +51,40 @@ def post(base, token, path, body):
     return [json.loads(line) for line in text.splitlines() if line.strip()]
 
 
+def totals():
+    """Adds up every place already saved in out/eval, so two days of runs give one set of numbers."""
+    qloo_top, plain_scored, plain_unscored, plain_places, places_found, done = [], [], 0, 0, 0, 0
+    for path in sorted(OUT.glob("*.json")):
+        saved = json.loads(path.read_text(encoding="utf-8"))
+        picks = next(e for e in saved["plain"] if e["t"] == "plain")
+        brands = next((e["items"] for e in saved["stage"] if e["t"] == "section" and e["key"] == "brands"), [])
+        qloo_top += [item["affinity"] for item in brands[:4] if isinstance(item.get("affinity"), (int, float))]
+        for brand in picks["brands"]:
+            if isinstance(brand.get("qloo_affinity"), (int, float)):
+                plain_scored.append(brand["qloo_affinity"])
+            else:
+                plain_unscored += 1
+        plain_places += len(picks["places"])
+        places_found += sum(1 for place in picks["places"] if place.get("found"))
+        done += 1
+    print(f"places measured: {done}")
+    print(f"Qloo's top four brands, mean affinity: {statistics.mean(qloo_top):.3f} ({len(qloo_top)} picks)")
+    print(f"writer's own brands that Qloo scored, mean affinity: {statistics.mean(plain_scored):.3f} ({len(plain_scored)} picks)")
+    print(f"writer's brands Qloo could not score: {plain_unscored} of {len(plain_scored) + plain_unscored}")
+    print(f"writer's places in Qloo's local list: {places_found} of {plain_places}")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("base")
-    parser.add_argument("--token-file", required=True)
+    parser.add_argument("--token-file")
+    parser.add_argument("--totals", action="store_true", help="add up every place saved in out/eval, no calls")
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--skip", type=int, default=0, help="start after this many places (the cap allows 10 a day)")
     args = parser.parse_args()
+    if args.totals:
+        return totals()
     base, token = args.base.rstrip("/"), read_token(args.token_file)
     OUT.mkdir(parents=True, exist_ok=True)
     qloo_top, plain_scored, plain_unscored, plain_places, places_found, done = [], [], 0, 0, 0, 0
