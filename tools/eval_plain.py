@@ -1,6 +1,6 @@
 """The measured claim: for 20 places, the same writer with no taste data picks brands and places, and Qloo scores them.
 
-    python tools/eval_plain.py <base url> --token-file <file with WARM_TOKEN=...> [--limit 20]
+    python tools/eval_plain.py <base url> --token-file <file with WARM_TOKEN=...> [--limit 20] [--skip 10]
 
 For each place it runs one brief (Design forward lens, a fixed room), then the Qloo off tab for that brief. It writes
 every answer to out/eval/ (local only: Qloo response data never goes in the repo) and prints only totals:
@@ -56,11 +56,12 @@ def main():
     parser.add_argument("base")
     parser.add_argument("--token-file", required=True)
     parser.add_argument("--limit", type=int, default=20)
+    parser.add_argument("--skip", type=int, default=0, help="start after this many places (the cap allows 10 a day)")
     args = parser.parse_args()
     base, token = args.base.rstrip("/"), read_token(args.token_file)
     OUT.mkdir(parents=True, exist_ok=True)
     qloo_top, plain_scored, plain_unscored, plain_places, places_found, done = [], [], 0, 0, 0, 0
-    for city, area in PLACES[: args.limit]:
+    for city, area in PLACES[args.skip : args.skip + args.limit]:
         body = {"city": city, "neighbourhood": area, "lens": LENS, "room": ROOM, "features": ["natural light"]}
         stage = post(base, token, "/api/stage", body)
         run = next((e for e in stage if e["t"] == "run"), {})
