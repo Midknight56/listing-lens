@@ -184,7 +184,9 @@ def main():
         print(f"{filename} {label}")
     checks.append(("secret_values", len(hits)))
 
-    checks.append(("qloo_response_data", _qloo_data(patch_text, paths | set(tracked_paths))))
+    # The self test holds a made up id next to an affinity on purpose, so its own lines are not Qloo data.
+    qloo_patch = _git("log", "--all", "-p", "--", ".", ":(exclude)tools/test_public_check.py")
+    checks.append(("qloo_response_data", _qloo_data(qloo_patch, paths | set(tracked_paths))))
     checks.append(("dashes_in_public_text", _dashes()))
 
     license_path = ROOT / "LICENSE"

@@ -50,6 +50,7 @@ def main():
         "clean": ({"README.md": "Plain words, no faults.\n"}, empty, 0),
         # The fake id is joined at run time, so this file never holds the pattern it plants.
         "qloo data": ({"data.json": '{"entity_id": "' + FAKE_ID + '", "affinity": 0.9}\n'}, empty, 1),
+        "own self test fixture": ({"tools/test_public_check.py": '{"entity_id": "' + FAKE_ID + '", "affinity": 0.9}\n'}, empty, 0),
         "samples folder": ({"samples/runs.json": "{}\n"}, empty, 1),
         "dash in readme": ({"README.md": "A brief — for stagers.\n"}, empty, 1),
         "dash in page string": ({"public/app.js": "const t = 'keep - swap'\n"}, empty, 1),
