@@ -2,6 +2,7 @@
 
     python tools/demo_check.py                         the local `wrangler dev` on port 8787
     python tools/demo_check.py https://<host> 3        three rounds against a deployed Worker
+    python tools/demo_check.py https://<host> 3 --token-file <secret file>   the same as the owner (no per visitor cap)
 
 A run passes when it has no error, all four sections, an audit with at least 3 verdicts, a paragraph that has no
 banned term, and (when live) at least 8 Qloo calls. The typed request changes its room each round, so it cannot come
@@ -14,9 +15,18 @@ import time
 import urllib.error
 import urllib.request
 
-BASE = sys.argv[1].rstrip('/') if len(sys.argv) > 1 else 'http://127.0.0.1:8787'
-ROUNDS = int(sys.argv[2]) if len(sys.argv) > 2 else 1
-HEADERS = {'Content-Type': 'application/json', 'User-Agent': 'listing-lens-demo-check/1.0'}
+ARGS = sys.argv[1:]
+# --token-file sends the owner's warm token: it skips only the per visitor caps (3 fresh runs a day), never the daily
+# totals, so the owner can run the check more than once a day. The token is never printed.
+TOKEN = None
+if '--token-file' in ARGS:
+    at = ARGS.index('--token-file')
+    lines = open(ARGS[at + 1], encoding='utf-8-sig').read().splitlines()
+    TOKEN = next((l.split('=', 1)[1].strip().strip('"') for l in lines if l.startswith('WARM_TOKEN=')), lines[0].strip())
+    del ARGS[at:at + 2]
+BASE = ARGS[0].rstrip('/') if len(ARGS) > 0 else 'http://127.0.0.1:8787'
+ROUNDS = int(ARGS[1]) if len(ARGS) > 1 else 1
+HEADERS = {'Content-Type': 'application/json', 'User-Agent': 'listing-lens-demo-check/1.0'} | ({'X-Warm-Token': TOKEN} if TOKEN else {})
 # A short copy of the scan's list, so the check does not trust the code it checks.
 BANNED = ['family', 'families', 'kids', 'children', 'singles', 'couple', 'young', 'retiree', 'seniors', 'adults only',
           'students', 'christian', 'church', 'exclusive', 'safe neighborhood', 'perfect for', 'ideal for', 'man cave']
