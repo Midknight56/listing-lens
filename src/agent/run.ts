@@ -335,6 +335,12 @@ const OFF_SHELF = new RegExp(
 const GENRE = "urn:tag:genre:media:";
 export const SHELF_TAGS = ["design", "architecture", "art", "photography", "travel", "food", "cooking", "nature",
   "gardening", "fashion"].map((tag) => GENRE + tag);
+// Each preset lens leans on its own half of the shelf, so flipping the lens changes the books too (one shared book
+// of six in Chicago, against five with the whole shelf, 26 Oct). A typed lens gets the whole shelf.
+export const LENS_SHELVES: Record<string, string[]> = {
+  "Design forward": ["architecture", "design", "photography", "art", "fashion"].map((tag) => GENRE + tag),
+  "Classic comfort": ["food", "cooking", "gardening", "nature", "travel"].map((tag) => GENRE + tag),
+};
 export const OFF_SHELF_TAGS = ["politics", "history_politics", "religion", "religion_spirituality", "race", "lgbt",
   "parenting"].map((tag) => GENRE + tag);
 
@@ -542,7 +548,7 @@ export async function run(
           seedIds: anchors.map((anchor) => anchor.id),
           type: "book",
           location: (scope === request.neighbourhood ? request.city : where) || undefined,
-          tags: SHELF_TAGS,
+          tags: LENS_SHELVES[request.lens.label] ?? SHELF_TAGS,
           excludeTags: OFF_SHELF_TAGS,
           take: 12,
         }),

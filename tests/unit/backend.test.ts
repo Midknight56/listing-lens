@@ -296,6 +296,55 @@ describe("backend copy and scoring rules", () => {
     ]);
   });
 
+  it("gives each lens its own coffee table books in the same city", async () => {
+    const genres = ["design", "architecture", "art", "photography", "travel", "food", "cooking", "nature",
+      "gardening", "fashion"];
+    const booksFor = async (label: string) => {
+      const events: StageEvent[] = [];
+      const qloo = {
+        search: async (query: string) => ({
+          results: [{ id: `ent-test-17${query.length}`, name: query, type: "brand", tags: [] }],
+          cached: false,
+        }),
+        insights: async ({ type, tags, take }: { type: string; tags?: string[]; take?: number }) => {
+          // Two books per genre; Qloo answers with the books of the genres asked for, best genre first.
+          const results: Entity[] =
+            type === "book"
+              ? genres
+                  .filter((genre) => !tags?.length || tags.includes(`urn:tag:genre:media:${genre}`))
+                  .flatMap((genre) => [1, 2].map((n) => ({
+                    id: `ent-test-18${n}`, name: `${genre} book ${n}`, type, tags: [genre],
+                  })))
+                  .slice(0, take ?? 6)
+              : [1, 2, 3].map((n) => ({ id: `ent-test-19${n}`, name: `Sample ${n}`, type, tags: [] }));
+          return { cached: false, locality: null, results };
+        },
+        quotaLeft: async () => 40000,
+      };
+      await run(
+        { city: "Test City", lens: { label, anchors: ["One"] }, room: [], features: [] },
+        {
+          qloo: qloo as never,
+          budget: { reserve: async () => null },
+          emit: async (event) => {
+            events.push(event);
+          },
+        },
+      );
+      const books = events.find((event) => event.t === "section" && event.key === "books");
+      return books && "items" in books ? books.items.map((item) => item.name) : [];
+    };
+    const design = await booksFor("Design forward");
+    const classic = await booksFor("Classic comfort");
+    expect(design).toHaveLength(6);
+    expect(classic).toHaveLength(6);
+    const shared = design.filter((name) => classic.includes(name)).length;
+    // A judge flips the lens: at most 2 of 6 books may stay the same.
+    expect(shared).toBeLessThanOrEqual(2);
+    // A typed lens still gets books, from the whole safe list.
+    expect(await booksFor("My own lens")).toHaveLength(6);
+  });
+
   it("shortens book display names and keeps the complete title in detail", () => {
     const title =
       "A thoughtful guide to comfortable rooms: notes on living well";
