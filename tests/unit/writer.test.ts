@@ -176,7 +176,7 @@ describe("plain picks", () => {
     expect(
       ideas(echo, ["Test City", "Herman Miller", "Kinfolk", "Khruangbin", "IKEA", "West Elm", "Pottery Barn", "CB2"]),
     ).toBeNull();
-    expect(PLAIN_PROMPT).toContain("Do not repeat");
+    expect(PLAIN_PROMPT).toContain("Never suggest");
   });
 });
 

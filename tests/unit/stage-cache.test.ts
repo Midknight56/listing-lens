@@ -376,10 +376,12 @@ describe("run recording", () => {
 
 describe("plain picks on the host", () => {
   const six = (prefix: string) => Array.from({ length: 6 }, (_, i) => `${prefix} ${i + 1}`);
+  const facts: unknown[] = [];
   async function plainWith(replies: string[]) {
     const db = new FakeD1();
     const id = "00000000-0000-4000-8000-000000000002";
     let calls = 0;
+    facts.length = 0;
     try {
       await new BriefStore(db).save(
         id,
@@ -393,7 +395,10 @@ describe("plain picks on the host", () => {
         {
           qloo: dependencies().qloo,
           writer: {
-            write: async () => ({ content: replies[calls++] ?? "", prompt_tokens: 1, completion_tokens: 1, neurons: 0.2 }),
+            write: async (_prompt: string, given: unknown) => {
+              facts.push(given);
+              return { content: replies[calls++] ?? "", prompt_tokens: 1, completion_tokens: 1, neurons: 0.2 };
+            },
           },
         },
       );
@@ -409,8 +414,10 @@ describe("plain picks on the host", () => {
     const { status, lines } = await plainWith([reply]);
     expect(status).toBe(200);
     expect(lines[1].brands.map((brand: { name: string }) => brand.name)).toEqual(six("Brand").slice(0, 4));
-    // Six asked, so two repeats still leave four (five asked left three, and the reply failed).
-    expect(PLAIN_PROMPT).toContain("suggest six furniture or home decor brands and six real places");
+    // Eight brands asked and the room sent as "avoid": the model had filled its list with the room's own brands.
+    expect(PLAIN_PROMPT).toContain("suggest eight furniture or home decor brands and six real places");
+    expect(PLAIN_PROMPT).toContain("Never suggest a brand listed in avoid");
+    expect(facts[0]).toEqual({ city: "Test City", interests: ["Test Anchor"], avoid: ["Room A", "Room B"] });
   });
 
   it("drops only the place whose name trips the fair housing scan", async () => {

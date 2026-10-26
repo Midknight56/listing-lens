@@ -9,12 +9,13 @@ interface PlainIdeas {
   brands: string[];
   places: string[];
 }
-/** The model's own picks with no taste data. Asked for six of each so four remain after echoes and scanned names are
- *  dropped: in a probe of 8 East Nashville replies the model repeated a room brand in 4. */
+/** The model's own picks with no taste data. The room's brands go in as "avoid", and eight brands are asked for, so
+ *  four remain after echoes and scanned names are dropped: with six asked and the room sent as "room", the model gave
+ *  back the room's own brands and left too few in 3 of 6 Silver Lake replies; with this prompt, 6 of 6 passed. */
 export const PLAIN_PROMPT = [
-  "From general knowledge only, suggest six furniture or home decor brands and six real places in the city",
+  "From general knowledge only, suggest eight furniture or home decor brands and six real places in the city",
   "(restaurants, bars, shops, venues) that a buyer with these interests might like.",
-  "Do not repeat any interest, room brand or the city name.",
+  "Never suggest a brand listed in avoid, an interest or the city name.",
   "Answer with JSON only, using exactly the keys brands and places, each a list of names.",
 ].join(" ");
 
@@ -118,7 +119,7 @@ export async function plain(
     try {
       reply = await deps.writer.write(
         PLAIN_PROMPT,
-        { city: scope, interests: saved.request.lens.anchors, room: saved.request.room },
+        { city: scope, interests: saved.request.lens.anchors, avoid: saved.request.room },
         220,
       );
     } catch {
