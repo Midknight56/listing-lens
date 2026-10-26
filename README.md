@@ -66,8 +66,9 @@ the date it was recorded.
 
 ## Run it yourself
 
-You need Node 24 and a Cloudflare account. Put your own Qloo key in `.dev.vars` as `QLOO_KEY`, with a
-`SESSION_SECRET` and a `WARM_TOKEN` of your choice.
+You need Node 24 and a Cloudflare account. Put your account id in `wrangler.jsonc` and remove the `LEDGER` database
+there: without it the app counts its writing in its own database. Put your own Qloo key in `.dev.vars` as `QLOO_KEY`,
+with a `SESSION_SECRET` and a `WARM_TOKEN` of your choice.
 
 ```bash
 npm ci
@@ -81,10 +82,21 @@ npx wrangler d1 migrations apply listing-lens --local
 npx wrangler dev
 ```
 
+Then build the list of home brands for the room audit, once. Put your `WARM_TOKEN` in the header. It answers
+`{"saved":31}`. Without it the audit has no home brands to score against.
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/warm -H "X-Warm-Token: your WARM_TOKEN"
+```
+
 Tests:
 
 ```bash
 npm run gate
+```
+
+```bash
+npx playwright install chromium
 ```
 
 ```bash
