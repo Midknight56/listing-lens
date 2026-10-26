@@ -100,8 +100,11 @@ npx playwright install chromium
 ```
 
 ```bash
-node tools/e2e.mjs http://127.0.0.1:8787
+node tools/e2e.mjs http://127.0.0.1:8787 --token-file .dev.vars
 ```
+
+The play through makes more than the 3 fresh briefs a visitor gets each day. `--token-file` sends your `WARM_TOKEN`, so the
+test skips the visitor limit. The daily totals still apply.
 
 ```bash
 node tools/phones.mjs http://127.0.0.1:8787
