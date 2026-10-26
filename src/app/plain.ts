@@ -9,44 +9,53 @@ interface PlainIdeas {
   brands: string[];
   places: string[];
 }
-/** The model's own picks with no taste data. Asked for five of each so four remain after echoes are dropped. */
+/** The model's own picks with no taste data. Asked for six of each so four remain after echoes and scanned names are
+ *  dropped: in a probe of 8 East Nashville replies the model repeated a room brand in 4. */
 export const PLAIN_PROMPT = [
-  "From general knowledge only, suggest five furniture or home decor brands and five real places in the city",
+  "From general knowledge only, suggest six furniture or home decor brands and six real places in the city",
   "(restaurants, bars, shops, venues) that a buyer with these interests might like.",
   "Do not repeat any interest, room brand or the city name.",
   "Answer with JSON only, using exactly the keys brands and places, each a list of names.",
 ].join(" ");
 
+export type PlainCheck = PlainIdeas | { fault: "parse" | "short" | "scan"; terms?: string[] };
+
 /** Reads four brands and four places, dropping any name that only repeats the input (an interest, a room brand, the
- *  city), since an echo says nothing about what the model knows. */
-export function ideas(text: string, echoes: string[] = []): PlainIdeas | null {
+ *  city), since an echo says nothing about what the model knows, and any name the fair housing scan flags. Says which
+ *  check failed when four of each do not remain. */
+export function checkPlain(text: string, echoes: string[] = []): PlainCheck {
   const repeated = new Set(echoes.map((name) => name.trim().toLocaleLowerCase()));
   const first = text.indexOf("{"),
     last = text.lastIndexOf("}");
-  if (first < 0 || last < first) return null;
+  if (first < 0 || last < first) return { fault: "parse" };
+  let value: { brands?: unknown; places?: unknown };
   try {
-    const value = JSON.parse(text.slice(first, last + 1)) as {
-      brands?: unknown;
-      places?: unknown;
-    };
-    if (!Array.isArray(value.brands) || !Array.isArray(value.places))
-      return null;
-    const brands = value.brands
-      .filter((item): item is string => typeof item === "string")
-      .map((item) => item.trim())
-      .filter((item) => item && !repeated.has(item.toLocaleLowerCase()))
-      .slice(0, 4);
-    const places = value.places
-      .filter((item): item is string => typeof item === "string")
-      .map((item) => item.trim())
-      .filter((item) => item && !repeated.has(item.toLocaleLowerCase()))
-      .slice(0, 4);
-    return brands.length === 4 && places.length === 4
-      ? { brands, places }
-      : null;
+    value = JSON.parse(text.slice(first, last + 1)) as typeof value;
   } catch {
-    return null;
+    return { fault: "parse" };
   }
+  if (!Array.isArray(value.brands) || !Array.isArray(value.places)) return { fault: "parse" };
+  const terms = new Set<string>();
+  const clean = (list: unknown[]) =>
+    list
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter((item) => item && !repeated.has(item.toLocaleLowerCase()))
+      .filter((item) => {
+        const hits = scanText(item);
+        hits.forEach((term) => terms.add(term));
+        return !hits.length;
+      })
+      .slice(0, 4);
+  const brands = clean(value.brands),
+    places = clean(value.places);
+  if (brands.length === 4 && places.length === 4) return { brands, places };
+  return terms.size ? { fault: "scan", terms: [...terms] } : { fault: "short" };
+}
+
+export function ideas(text: string, echoes: string[] = []): PlainIdeas | null {
+  const read = checkPlain(text, echoes);
+  return "fault" in read ? null : read;
 }
 export async function plain(
   request: Request,
@@ -93,34 +102,47 @@ export async function plain(
     dailyCap: DEFAULT_DAILY_NEURONS,
     accountCap: DEFAULT_ACCOUNT_NEURONS,
   });
-  const held = await ledger.reserve();
-  if (!held) return fail("Writing budget is spent for today.", 429);
   const events: import("../agent/events").Event[] = [
     { t: "run", id: body.id, mode: "live" },
   ];
-  let settled = false;
+  const echoes = [scope, saved.request.city, ...saved.request.lens.anchors, ...saved.request.room];
+  // One more try when a reply fails a check. Each try holds its own place in the ledger, so the daily caps still hold.
+  let result: PlainIdeas | null = null;
+  for (let attempt = 1; attempt <= 2 && !result; attempt++) {
+    const held = await ledger.reserve();
+    if (!held)
+      return attempt === 1
+        ? fail("Writing budget is spent for today.", 429)
+        : fail("Plain picks did not pass the text check.", 422);
+    let reply;
+    try {
+      reply = await deps.writer.write(
+        PLAIN_PROMPT,
+        { city: scope, interests: saved.request.lens.anchors, room: saved.request.room },
+        220,
+      );
+    } catch {
+      await held.settle(0);
+      return fail("Plain picks are unavailable right now.");
+    }
+    await held.settle(reply.neurons ?? neuronsFor(reply.prompt_tokens, reply.completion_tokens));
+    const read = checkPlain(reply.content, echoes);
+    if ("fault" in read)
+      // The check and the reply's length only, never the reply's text.
+      console.warn(
+        JSON.stringify({
+          at: "plain",
+          attempt,
+          check: read.fault,
+          length: reply.content.length,
+          finish: reply.finish ?? null,
+          ...(read.terms ? { terms: read.terms } : {}),
+        }),
+      );
+    else result = read;
+  }
+  if (!result) return fail("Plain picks did not pass the text check.", 422);
   try {
-    const reply = await deps.writer.write(
-      PLAIN_PROMPT,
-      {
-        city: scope,
-        interests: saved.request.lens.anchors,
-        room: saved.request.room,
-      },
-      220,
-    );
-    await held.settle(
-      reply.neurons ?? neuronsFor(reply.prompt_tokens, reply.completion_tokens),
-    );
-    settled = true;
-    const result = ideas(reply.content, [
-      scope,
-      saved.request.city,
-      ...saved.request.lens.anchors,
-      ...saved.request.room,
-    ]);
-    if (!result || scanText(reply.content).length)
-      return fail("Plain picks did not pass the text check.", 422);
     const anchors = (
       await Promise.all(
         saved.request.lens.anchors.map((anchor) =>
@@ -170,7 +192,6 @@ export async function plain(
     events.push({ t: "plain", brands: plainBrands, places }, { t: "done" });
     return send(events);
   } catch {
-    if (!settled) await held.settle(0);
     return fail("Plain picks are unavailable right now.");
   }
 }

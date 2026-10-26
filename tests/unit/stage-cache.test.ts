@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PRESETS } from "../../src/app/presets";
 import { stage, visitorOf } from "../../src/app/stage";
-import { plain } from "../../src/app/plain";
+import { plain, PLAIN_PROMPT } from "../../src/app/plain";
 import { BriefStore } from "../../src/store/d1";
 import type { Entity, QlooClient } from "../../src/qloo/client";
 import { FakeD1 } from "./fake-d1";
@@ -370,6 +370,76 @@ describe("run recording", () => {
       expect(lines[1].places[0]).toEqual({ name: "Cafe One", found: true });
     } finally {
       db.close();
+    }
+  });
+});
+
+describe("plain picks on the host", () => {
+  const six = (prefix: string) => Array.from({ length: 6 }, (_, i) => `${prefix} ${i + 1}`);
+  async function plainWith(replies: string[]) {
+    const db = new FakeD1();
+    const id = "00000000-0000-4000-8000-000000000002";
+    let calls = 0;
+    try {
+      await new BriefStore(db).save(
+        id,
+        { city: "Test City", lens: { label: "Design forward", anchors: ["Test Anchor"] }, room: ["Room A", "Room B"], features: [] },
+        [{ t: "brief", intro: "Test", paragraph: "Test", written_by: "template", scope: "Test City", lens: "Design forward" }],
+        "live",
+      );
+      const response = await plain(
+        new Request("https://example.invalid/api/plain", { method: "POST", body: JSON.stringify({ id }) }),
+        { DB: db },
+        {
+          qloo: dependencies().qloo,
+          writer: {
+            write: async () => ({ content: replies[calls++] ?? "", prompt_tokens: 1, completion_tokens: 1, neurons: 0.2 }),
+          },
+        },
+      );
+      const lines = (await response.text()).trim().split("\n").map((line) => JSON.parse(line));
+      return { status: response.status, lines, calls };
+    } finally {
+      db.close();
+    }
+  }
+
+  it("keeps four of each when the model repeats two room brands", async () => {
+    const reply = JSON.stringify({ brands: ["Room A", "Room B", ...six("Brand").slice(0, 4)], places: six("Cafe") });
+    const { status, lines } = await plainWith([reply]);
+    expect(status).toBe(200);
+    expect(lines[1].brands.map((brand: { name: string }) => brand.name)).toEqual(six("Brand").slice(0, 4));
+    // Six asked, so two repeats still leave four (five asked left three, and the reply failed).
+    expect(PLAIN_PROMPT).toContain("suggest six furniture or home decor brands and six real places");
+  });
+
+  it("drops only the place whose name trips the fair housing scan", async () => {
+    const reply = JSON.stringify({ brands: six("Brand"), places: ["The Family Wash", ...six("Cafe").slice(0, 5)] });
+    const { status, lines } = await plainWith([reply]);
+    expect(status).toBe(200);
+    expect(lines[1].places.map((place: { name: string }) => place.name)).toEqual(six("Cafe").slice(0, 4));
+  });
+
+  it("asks once more when the first reply fails a check, and logs the check and length, not the text", async () => {
+    const logged: string[] = [];
+    const warn = console.warn;
+    console.warn = (line: string) => logged.push(line);
+    try {
+      const good = JSON.stringify({ brands: six("Brand"), places: six("Cafe") });
+      const { status, lines, calls } = await plainWith(["Sure! Here are some ideas: Secret Words", good]);
+      expect(status).toBe(200);
+      expect(calls).toBe(2);
+      expect(lines.map((event: { t: string }) => event.t)).toEqual(["run", "plain", "done"]);
+      expect(logged).toHaveLength(1);
+      expect(JSON.parse(logged[0])).toMatchObject({ at: "plain", attempt: 1, check: "parse", length: 39 });
+      expect(logged[0]).not.toContain("Secret");
+      // Two failed tries end in the server's own refusal text, and no third try.
+      const bad = await plainWith(["no json", "no json either", JSON.stringify({ brands: six("B"), places: six("C") })]);
+      expect(bad.status).toBe(422);
+      expect(bad.calls).toBe(2);
+      expect(bad.lines[0]).toMatchObject({ t: "error", text: "Plain picks did not pass the text check." });
+    } finally {
+      console.warn = warn;
     }
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { diffBriefs, escapeHtml, modeLabel, renderBrief, renderDiff, renderPlain, runSummary } from '../../public/render.js';
+import { readFileSync } from 'node:fs';
+import { diffBriefs, escapeHtml, modeLabel, plainNote, renderBrief, renderDiff, renderPlain, runSummary } from '../../public/render.js';
 
 describe('Staging Brief render functions', () => {
   it('escapes user supplied text', () => {
@@ -80,6 +81,15 @@ describe('Staging Brief render functions', () => {
     expect(html).toContain('One of their loves');
     expect(html).not.toContain('No pull here');
     expect(html).not.toContain('Beats');
+  });
+
+  it('shows the server own words when the Qloo off tab is refused', () => {
+    expect(plainNote([{ t: 'error', text: 'Plain picks did not pass the text check.' }, { t: 'done' }])).toBe('Plain picks did not pass the text check.');
+    expect(plainNote([])).toBe('Qloo off picks are not available yet.');
+    // The page reads the refusal's NDJSON instead of throwing on a non 200 answer.
+    const app = readFileSync('public/app.js', 'utf8');
+    expect(app).toContain('plainNote(seen)');
+    expect(app).not.toMatch(/fetch\('\/api\/plain'[\s\S]{0,200}!response\.ok/);
   });
 
   it('renders lazy thumbnails, and no empty box when a pick has no image', () => {

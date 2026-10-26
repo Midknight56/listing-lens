@@ -135,6 +135,11 @@ export function renderDiff(diff) {
   return `<h2>Lens difference</h2>${blocks}<div class="diff-block"><h3>Audit changes</h3>${changed.length ? changed.map((row) => `<p class="diff-line">${escapeHtml(row.name)}: ${escapeHtml(verdictNames[row.from] || row.from)} to ${escapeHtml(verdictNames[row.to] || row.to)}</p>`).join('') : '<p class="diff-line">No verdict changes</p>'}</div>`;
 }
 
+/** What the Qloo off tab says when no picks came back: the server's own error text, or a plain fallback. */
+export function plainNote(events = []) {
+  const error = (Array.isArray(events) ? events : []).find((event) => event?.t === 'error' && typeof event.text === 'string' && event.text);
+  return error ? error.text : 'Qloo off picks are not available yet.';
+}
 export function renderPlain(event = {}, qlooEvents = []) {
   const brands = Array.isArray(event.brands) ? event.brands : [];
   const places = Array.isArray(event.places) ? event.places : [];

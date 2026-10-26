@@ -1,4 +1,4 @@
-import { diffBriefs, modeLabel, renderBrief, renderDiff, renderPlain, runSummary } from './render.js';
+import { diffBriefs, modeLabel, plainNote, renderBrief, renderDiff, renderPlain, runSummary } from './render.js';
 
 const $ = (s) => document.querySelector(s);
 const form = $('#stage-form');
@@ -221,11 +221,14 @@ document.querySelectorAll('[data-tab]').forEach((button) => button.addEventListe
     plainContent.textContent = 'Asking the same model with no Qloo';
     try {
       const response = await fetch('/api/plain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: briefId }) });
-      if (!response.ok || !response.body) throw new Error();
+      // A refusal comes as NDJSON too, so the server's own words show (a spent budget, a failed check).
+      if (!response.body) throw new Error();
+      const seen = [];
       await readNdjson(response, (event) => {
+        seen.push(event);
         if (event.t === 'plain') { plainEvent = event; plainContent.innerHTML = renderPlain(event, activeEvents); }
-        if (event.t === 'error') plainContent.textContent = event.text || 'These picks are not available right now.';
       });
+      if (!plainEvent) plainContent.textContent = plainNote(seen);
     } catch { plainContent.textContent = 'Qloo off picks are not available yet.'; }
   }
 }));
