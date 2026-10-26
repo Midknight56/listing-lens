@@ -5,6 +5,7 @@ import { neuronsFor, type TextWriter } from "./model";
 import { safeTemplate } from "./template";
 import { whyLine, type AuditRow, type Event, type Pick } from "./events";
 import { RunCallBudget } from "../store/caps";
+import { MAX_RUN_QLOO_CALLS } from "../limits";
 
 export interface StageRequest {
   city: string;
@@ -530,15 +531,49 @@ export async function run(
         take: 6,
       }),
     );
-    const localPlaces = places.results.filter(
+    // One list can be empty in a neighbourhood while the city has plenty (Wicker Park had no books, 26 Oct). Ask that
+    // list again for the city, but only while the room's searches and the audit still fit in the call limit.
+    const widened = new Set<string>();
+    const widen = async (
+      key: string,
+      type: Parameters<QlooClient["insights"]>[0]["type"],
+      first: Awaited<ReturnType<typeof call>>,
+      extra: { popularityMax?: number },
+      take: number,
+    ) => {
+      const roomCalls = request.room.slice(0, 6).length + 1;
+      if (
+        first.results.length >= 3 ||
+        !request.neighbourhood ||
+        scope !== request.neighbourhood ||
+        MAX_RUN_QLOO_CALLS - callBudget.used() <= roomCalls
+      )
+        return first;
+      const wide = await call("/v2/insights", `${key} in ${request.city}`, () =>
+        deps.qloo.insights({
+          seedIds: anchors.map((anchor) => anchor.id),
+          type,
+          location: request.city,
+          ...extra,
+          take,
+        }),
+      );
+      if (wide.results.length <= first.results.length) return first;
+      widened.add(key);
+      return wide;
+    };
+    const bookList = await widen("books", "book", books, {}, 6);
+    const artistList = await widen("playlist", "artist", artists, {}, 8);
+    const placeList = await widen("places", "place", places, { popularityMax: 0.95 }, 6);
+    const localPlaces = placeList.results.filter(
       (place) =>
         !/\b(church|mosque|synagogue|temple|school|university|college)\b/i.test(
           [place.name, place.detail, place.address].filter(Boolean).join(" "),
         ),
     );
     const sections = [
-      { key: "books" as const, items: books.results.map(shortBook) },
-      { key: "playlist" as const, items: artists.results },
+      { key: "books" as const, items: bookList.results.map(shortBook) },
+      { key: "playlist" as const, items: artistList.results },
       { key: "places" as const, items: localPlaces },
     ];
     for (const section of sections) {
@@ -550,6 +585,7 @@ export async function run(
         key: section.key,
         items,
         ...(items.length < 3 ? { thin: true as const } : {}),
+        ...(widened.has(section.key) ? { from: request.city } : {}),
       });
     }
     const roomHits: { name: string; id?: string }[] = [];
@@ -627,7 +663,7 @@ export async function run(
     const plain = safeTemplate(baseFacts);
     const toWriter = writerFacts(
       scope || request.city,
-      scope !== request.neighbourhood,
+      scope !== request.neighbourhood || widened.has("places"),
       request.features,
       localPlaces,
     );

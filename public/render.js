@@ -71,7 +71,8 @@ function cardsHtml(section) {
       const image = hasImage ? `<img class="result-thumb" src="${escapeHtml(item.image)}" loading="lazy" referrerpolicy="no-referrer" alt="">` : '';
       return `<article class="result-card${hasImage ? ' has-image' : ''}">${image}<h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.why || item.detail || 'A match for this lens and place.')}</p><span class="affinity">Affinity ${score(item.affinity)}</span></article>`;
     }).join('')}</div>`;
-  return `<section class="result-section"><h2>${escapeHtml(title)}</h2>${body}</section>`;
+  const from = section.from ? `<p class="small section-from">From ${escapeHtml(section.from)}</p>` : '';
+  return `<section class="result-section"><h2>${escapeHtml(title)}</h2>${from}${body}</section>`;
 }
 
 export function renderBrief(events = [], otherLens = '', priorEvents = []) {

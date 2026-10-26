@@ -26,6 +26,12 @@ describe('Staging Brief render functions', () => {
     expect(html).toContain('Written by template');
   });
 
+  it('says when one list came from the whole city', () => {
+    const items = [{ name: 'One' }, { name: 'Two' }, { name: 'Three' }];
+    expect(renderBrief([{ t: 'section', key: 'books', items, from: 'Chicago' }])).toContain('From Chicago');
+    expect(renderBrief([{ t: 'section', key: 'books', items }])).not.toContain('section-from');
+  });
+
   it('shows thin data for short sections', () => {
     expect(renderBrief([{ t: 'section', key: 'places', items: [{ name: 'One' }] }])).toContain('Thin data here');
   });

@@ -183,6 +183,58 @@ describe("backend copy and scoring rules", () => {
     expect(events.find((event) => event.t === "brief")?.scope).toBe("Test City");
   });
 
+  it("asks again at city level for one list that is empty in the neighbourhood", async () => {
+    const asked: string[] = [];
+    const events: StageEvent[] = [];
+    const three = (type: string) => [
+      { id: "ent-test-1402", name: "Sample One", type, tags: [] },
+      { id: "ent-test-1403", name: "Sample Two", type, tags: [] },
+      { id: "ent-test-1404", name: "Sample Three", type, tags: [] },
+    ];
+    const qloo = {
+      search: async (query: string) => ({
+        results: [{ id: "ent-test-1401", name: query, type: "brand", tags: [] }],
+        cached: false,
+      }),
+      insights: async ({ type, location }: { type: string; location?: string }) => {
+        asked.push(`${type} @ ${location}`);
+        const empty = type === "book" && location === "Wicker Park, Chicago";
+        return {
+          cached: false,
+          locality: { id: "ent-test-1400", name: location ?? "", disambiguation: "Wicker Park, Chicago, Illinois" },
+          results: empty ? [] : three(type),
+        };
+      },
+      quotaLeft: async () => 40000,
+    };
+    await run(
+      {
+        city: "Chicago",
+        neighbourhood: "Wicker Park",
+        lens: { label: "Design forward", anchors: ["One", "Two", "Three"] },
+        room: ["IKEA", "West Elm", "CB2", "Article", "Muji", "Wayfair"],
+        features: [],
+      },
+      {
+        qloo: qloo as never,
+        budget: { reserve: async () => null },
+        emit: async (event) => {
+          events.push(event);
+        },
+      },
+    );
+    expect(asked).toContain("book @ Chicago");
+    // Only the empty list goes wide; the others stay in the neighbourhood.
+    expect(asked).not.toContain("artist @ Chicago");
+    const books = events.find((event) => event.t === "section" && event.key === "books");
+    expect(books).toMatchObject({ from: "Chicago" });
+    expect(books && "items" in books ? books.items : []).toHaveLength(3);
+    expect(events.some((event) => event.t === "error")).toBe(false);
+    // A full room still gets its audit inside the 16 call limit.
+    expect(events.filter((event) => event.t === "call")).toHaveLength(15);
+    expect(events.find((event) => event.t === "brief")?.scope).toBe("Wicker Park");
+  });
+
   it("shortens book display names and keeps the complete title in detail", () => {
     const title =
       "A thoughtful guide to comfortable rooms: notes on living well";

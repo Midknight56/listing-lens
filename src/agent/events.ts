@@ -52,6 +52,8 @@ export type Event =
       key: "brands" | "books" | "playlist" | "places";
       items: Pick[];
       thin?: true;
+      /** Set when this list was empty in the neighbourhood and came from the whole city instead. */
+      from?: string;
     }
   | { t: "audit"; rows: AuditRow[] }
   | {
