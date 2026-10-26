@@ -28,7 +28,7 @@ def post(base, token, body):
     request = urllib.request.Request(
         base + "/api/stage",
         data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json", "X-Warm-Token": token},
+        headers={"User-Agent": "listing-lens-tools/1.0", "Content-Type": "application/json", "X-Warm-Token": token},
     )
     with urllib.request.urlopen(request, timeout=180) as response:
         return [json.loads(line) for line in response.read().decode().splitlines() if line.strip()]
@@ -56,7 +56,7 @@ def main():
     args = parser.parse_args()
     base = args.base.rstrip("/")
     token = read_token(args.token_file)
-    with urllib.request.urlopen(base + "/api/presets", timeout=30) as response:
+    with urllib.request.urlopen(urllib.request.Request(base + "/api/presets", headers={"User-Agent": "listing-lens-tools/1.0"}), timeout=30) as response:
         presets = json.load(response)["presets"]
     bad = 0
     for preset in presets:

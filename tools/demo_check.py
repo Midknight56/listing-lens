@@ -11,6 +11,7 @@ the mode is printed.
 import json
 import sys
 import time
+import urllib.error
 import urllib.request
 
 BASE = sys.argv[1].rstrip('/') if len(sys.argv) > 1 else 'http://127.0.0.1:8787'
@@ -25,8 +26,14 @@ ROOMS = [['IKEA', 'West Elm', 'Pottery Barn', 'CB2'], ['Crate & Barrel', 'IKEA',
 
 def stage(body: dict) -> list:
     req = urllib.request.Request(BASE + '/api/stage', data=json.dumps(body).encode(), headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=240) as r:
-        return [json.loads(line) for line in r if line.strip()]
+    try:
+        with urllib.request.urlopen(req, timeout=240) as r:
+            text = r.read().decode()
+    except urllib.error.HTTPError as e:
+        text = e.read().decode()
+        if not text.lstrip().startswith('{'):
+            return [{'t': 'error', 'text': f'HTTP {e.code}: {text[:80]}'}]
+    return [json.loads(line) for line in text.splitlines() if line.strip()]
 
 
 def judge(events: list) -> list[str]:

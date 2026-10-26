@@ -39,13 +39,15 @@ def post(base, token, path, body):
     request = urllib.request.Request(
         base + path,
         data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json", "X-Warm-Token": token},
+        headers={"User-Agent": "listing-lens-tools/1.0", "Content-Type": "application/json", "X-Warm-Token": token},
     )
     try:
         with urllib.request.urlopen(request, timeout=240) as response:
             text = response.read().decode()
     except urllib.error.HTTPError as error:
         text = error.read().decode()
+        if not text.lstrip().startswith("{"):
+            return [{"t": "error", "text": f"HTTP {error.code}: {text[:80]}"}]
     return [json.loads(line) for line in text.splitlines() if line.strip()]
 
 
