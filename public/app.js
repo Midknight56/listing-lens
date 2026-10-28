@@ -1,4 +1,4 @@
-import { askPlain, compareListings, diffBriefs, modeLabel, renderBrief, renderCompare, renderDiff, renderPlain, runSummary } from './render.js';
+import { askPlain, compareListings, diffBriefs, modeLabel, parseStyle, renderBrief, renderCompare, renderDiff, renderHomeowner, renderPlain, runSummary, styleLink } from './render.js';
 
 const $ = (s) => document.querySelector(s);
 const form = $('#stage-form');
@@ -25,6 +25,10 @@ const briefView = $('#brief-view');
 const featureNode = $('#feature-list');
 const formDetails = $('#form-details');
 const comparePanel = $('#compare-panel');
+const homeownerButton = $('#homeowner-button');
+const stagerName = $('#stager-name');
+const homeownerSheet = $('#homeowner-sheet');
+const styleName = $('#style-name');
 const compareChips = $('#compare-chips');
 const compareCity = $('#compare-city');
 const compareNeighbourhood = $('#compare-neighbourhood');
@@ -156,7 +160,7 @@ function handleEvent(event) {
     otherLens ||= catalogue.lenses.find((lens) => lens.label !== activeLens) || null;
     briefContent.innerHTML = renderBrief(activeEvents, otherLens?.label || '', baselineEvents || []); runSummaryNode.textContent = runSummary(activeEvents);
     runLog.open = false;
-    shareButton.hidden = !briefId; printButton.hidden = false;
+    shareButton.hidden = !briefId; printButton.hidden = false; homeownerButton.hidden = false; stagerName.hidden = false;
     lensToggle.hidden = true;
     if (otherLens) lensToggle.textContent = `See it for ${otherLens.label}`;
     drawCompare();
@@ -204,7 +208,19 @@ shareButton.addEventListener('click', async () => {
   const url = `${location.origin}/s/${encodeURIComponent(briefId)}`;
   try { await navigator.clipboard.writeText(url); shareButton.textContent = 'Link copied'; } catch { shareButton.textContent = 'Copy unavailable'; }
 });
-printButton.addEventListener('click', () => window.print());
+printButton.addEventListener('click', () => { document.body.classList.remove('print-homeowner'); window.print(); });
+// The homeowner's page: what stays, what changes and what comes in, with the stager's name and no scores.
+homeownerButton.addEventListener('click', () => {
+  homeownerSheet.innerHTML = renderHomeowner(activeEvents, stagerName.value);
+  document.body.classList.add('print-homeowner');
+  addEventListener('afterprint', () => document.body.classList.remove('print-homeowner'), { once: true });
+  window.print();
+});
+$('#save-style').addEventListener('click', async (event) => {
+  const lens = { label: styleName.value.trim(), anchors: anchors.map((input) => input.value.trim()).filter(Boolean).slice(0, 3) };
+  if (lens.label.length < 2 || !lens.anchors.length) { errorBox.textContent = 'Name the style and type at least one love.'; errorBox.hidden = false; return; }
+  try { await navigator.clipboard.writeText(styleLink(location.origin, lens)); event.target.textContent = 'Style link copied'; } catch { event.target.textContent = 'Copy unavailable'; }
+});
 async function flipLens() {
   if (!briefId || !otherLens || busy) return;
   baselineEvents = activeEvents.slice(); const originalRequest = requestState;
@@ -275,7 +291,7 @@ async function loadShared(id) {
     const response = await fetch(`/api/brief/${encodeURIComponent(id)}`); if (!response.ok) throw new Error();
     const saved = await response.json(); requestState = saved.request; briefId = id; activeEvents = Array.isArray(saved.events) ? saved.events : [];
     const run = activeEvents.find((event) => event.t === 'run'); if (run) { modeBadge.textContent = modeLabel(run); modeBadge.hidden = false; }
-    briefContent.innerHTML = renderBrief(activeEvents); printButton.hidden = false;
+    briefContent.innerHTML = renderBrief(activeEvents); printButton.hidden = false; homeownerButton.hidden = false; stagerName.hidden = false;
   } catch { errorBox.textContent = 'This brief could not be found.'; errorBox.hidden = false; }
 }
 async function loadDev() {
@@ -300,6 +316,12 @@ async function loadDev() {
   catch { errorBox.textContent = 'The sample brief could not be loaded.'; errorBox.hidden = false; }
 }
 await loadPresets();
+// A house style link adds its named lens to the chips and selects it.
+const houseStyle = parseStyle(location.search);
+if (houseStyle) {
+  catalogue.lenses = [...catalogue.lenses.filter((lens) => lens.label !== houseStyle.label), houseStyle];
+  currentLens = houseStyle; anchors.forEach((input, i) => { input.value = houseStyle.anchors[i] || ''; }); styleName.value = houseStyle.label; drawLenses();
+}
 drawFeatures();
 const shareMatch = location.pathname.match(/^\/s\/([^/]+)$/);
 if (new URLSearchParams(location.search).has('dev')) await loadDev();

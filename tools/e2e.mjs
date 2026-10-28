@@ -153,6 +153,35 @@ async function main() {
     const emptyCompare = await calmError(page)
     check('Compare with no city asks for one and starts no run', /Add a city for the second listing/.test(emptyCompare) && stageBodies.length === stagesBeforeEmpty, emptyCompare)
 
+    // The homeowner page: in print, only the owner's plan shows, with the stager's name and no scores.
+    await page.locator('#stager-name').fill('Dana Lee')
+    await page.evaluate(() => { window.print = () => {} })
+    await page.locator('#homeowner-button').click()
+    await page.emulateMedia({ media: 'print' })
+    const sheet = await page.locator('#homeowner-sheet').innerText()
+    check('the homeowner page prints the plan with the stager and no scores', /Prepared by Dana Lee/.test(sheet) && /Staging plan for your home/.test(sheet) && !/Qloo|ffinity|0\.9/.test(sheet) && !(await page.locator('.page').isVisible()), sheet.split('\n').slice(0, 3).join(' / '))
+    await page.screenshot({ path: 'out/e2e-homeowner.png', fullPage: true })
+    await page.emulateMedia({ media: 'screen' })
+    await page.evaluate(() => dispatchEvent(new Event('afterprint')))
+
+    // House styles: a style link selects its named lens, and Copy style link makes one that reads back the same.
+    const style = { label: 'Harbour House', anchors: ['Muji', 'Kinfolk', 'Bon Iver'] }
+    await page.goto(`${BASE}/?style=${encodeURIComponent(JSON.stringify(style))}`)
+    const styleChip = page.locator('#lens-chips .chip').filter({ hasText: 'Harbour House' })
+    await styleChip.waitFor({ timeout: 15000 })
+    const typed = await page.locator('.anchor').evaluateAll((inputs) => inputs.map((input) => input.value))
+    check('a house style link selects its named lens', await styleChip.getAttribute('aria-pressed') === 'true' && typed.join('|') === style.anchors.join('|'), typed.join(', '))
+    await page.locator('#style-name').fill('Harbour House 2')
+    await page.locator('#save-style').click()
+    const copiedStyle = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '')
+    const readBack = copiedStyle ? JSON.parse(new URL(copiedStyle).searchParams.get('style') || 'null') : null
+    check('Copy style link makes a link that reads back the same lens', readBack?.label === 'Harbour House 2' && readBack?.anchors?.join('|') === style.anchors.join('|'))
+
+    // Bad path: a broken style link is ignored and the page still works.
+    await page.goto(`${BASE}/?style=broken`)
+    await page.locator('.preset-card').first().waitFor({ timeout: 15000 })
+    check('a broken style link adds no lens', await page.locator('#lens-chips .chip').count() === 2 && await page.locator('#error-box:not([hidden])').count() === 0)
+
     // Bad path: an unknown city remains calm and does not damage the page.
     await page.goto(BASE + '/')
     await page.locator('#city').fill('Qwxzv')

@@ -221,3 +221,39 @@ export async function askPlain(fetchImpl, id, tries = 2) {
   }
   return { plain: null, note: 'Qloo off picks did not load. Tap Qloo off to try again.' };
 }
+
+/** The page a stager hands the homeowner: what stays, what changes and what comes in, with no scores and no taste data words. */
+export function renderHomeowner(events = [], stager = '') {
+  const list = Array.isArray(events) ? events : [];
+  const brief = [...list].reverse().find((event) => event?.t === 'brief') || {};
+  const relax = [...list].reverse().find((event) => event?.t === 'relax');
+  const rows = [...list].reverse().find((event) => event?.t === 'audit')?.rows || [];
+  const names = (key, count) => (lastSection(list, key)?.items || []).slice(0, count).map((item) => `<li>${escapeHtml(item.name)}</li>`).join('');
+  const block = (title, items) => items ? `<section><h2>${title}</h2><ul>${items}</ul></section>` : '';
+  const keep = rows.filter((row) => row.verdict === 'keep').map((row) => `<li>${escapeHtml(row.name)}</li>`).join('');
+  const change = rows.flatMap((row) => {
+    if (row.verdict === 'swap') return [`<li>Swap ${escapeHtml(row.name)}${row.swap?.name ? ` for ${escapeHtml(row.swap.name)}` : ''}</li>`];
+    if (row.verdict === 'cut') return [`<li>Take out ${escapeHtml(row.name)}${row.swap?.name ? `, bring in ${escapeHtml(row.swap.name)}` : ''}</li>`];
+    return [];
+  }).join('');
+  const room = !rows.length ? '<section><h2>The room</h2><p>No pieces to change in this room.</p></section>'
+    : `${block('What stays', keep)}${change ? block('What changes', change) : '<section><h2>What changes</h2><p>Everything in the room stays.</p></section>'}`;
+  const scope = relax?.to || brief.scope || '';
+  const name = String(stager || '').trim();
+  return `<header>${name ? `<p class="prepared">Prepared by ${escapeHtml(name)}</p>` : ''}<h1>Staging plan for your home${scope ? ` in ${escapeHtml(scope)}` : ''}</h1></header>${room}${block('Brands to show', names('brands', 4))}${block('On the coffee table', names('books', 3))}${block('Open house music', names('playlist', 3))}${block('Nearby favourites', names('places', 4))}${brief.paragraph ? `<section><h2>Listing description</h2><p>${escapeHtml(brief.paragraph)}</p></section>` : ''}`;
+}
+
+const goodText = (value) => typeof value === 'string' && value.trim().length >= 2 && value.length <= 60;
+/** A house style is a named lens carried in a share link: no account and nothing stored on the server. */
+export function styleLink(origin, lens) {
+  return `${origin}/?style=${encodeURIComponent(JSON.stringify({ label: lens.label, anchors: lens.anchors }))}`;
+}
+export function parseStyle(search = '') {
+  try {
+    const raw = new URLSearchParams(search).get('style');
+    if (!raw) return null;
+    const value = JSON.parse(raw);
+    if (!goodText(value?.label) || !Array.isArray(value.anchors) || value.anchors.length < 1 || value.anchors.length > 3 || !value.anchors.every(goodText)) return null;
+    return { label: value.label.trim(), anchors: value.anchors.map((anchor) => anchor.trim()) };
+  } catch { return null; }
+}
