@@ -120,7 +120,7 @@ export function diffBriefs(a = [], b = []) {
   return { sections: ['brands', 'books', 'playlist', 'places'].map((key) => sectionDiff(a, b, key)), audit: changedAudit };
 }
 
-export function renderDiff(diff) {
+export function renderDiff(diff, title = 'Lens difference') {
   const labels = { brands: 'Brands', books: 'Books', playlist: 'Playlist', places: 'Local favourites' };
   const blocks = (diff?.sections || []).map((section) => {
     const moved = section.moved.map((item) => ({ name: item.name, label: `${item.delta > 0 ? 'Up' : 'Down'} ${Math.abs(item.delta)}` }));
@@ -132,7 +132,7 @@ export function renderDiff(diff) {
     return `<div class="diff-block"><h3>${escapeHtml(labels[section.key] || section.key)}</h3><div class="diff-chips">${chips.join('') || '<span class="diff-chip">No change</span>'}</div></div>`;
   }).join('');
   const changed = diff?.audit || [];
-  return `<h2>Lens difference</h2>${blocks}<div class="diff-block"><h3>Audit changes</h3>${changed.length ? changed.map((row) => `<p class="diff-line">${escapeHtml(row.name)}: ${escapeHtml(verdictNames[row.from] || row.from)} to ${escapeHtml(verdictNames[row.to] || row.to)}</p>`).join('') : '<p class="diff-line">No verdict changes</p>'}</div>`;
+  return `<h2>${escapeHtml(title)}</h2>${blocks}<div class="diff-block"><h3>Audit changes</h3>${changed.length ? changed.map((row) => `<p class="diff-line">${escapeHtml(row.name)}: ${escapeHtml(verdictNames[row.from] || row.from)} to ${escapeHtml(verdictNames[row.to] || row.to)}</p>`).join('') : '<p class="diff-line">No verdict changes</p>'}</div>`;
 }
 
 /** What the Qloo off tab says when no picks came back: the server's own error text, or a plain fallback. */
@@ -150,4 +150,74 @@ export function renderPlain(event = {}, qlooEvents = []) {
   const qlooBrands = (qlooSections.get('brands') || []).map((item) => `<li>${escapeHtml(item.name)} <span class="small">${score(item.affinity)}</span></li>`).join('');
   const qlooPlaces = (qlooSections.get('places') || []).map((item) => `<li>${escapeHtml(item.name)} <span class="small">${score(item.affinity)}</span></li>`).join('');
   return `<h2>Qloo off picks</h2><div class="result-grid"><section><h3>Qloo off</h3><h3>Brands</h3><ul>${brandRows || '<li>No picks yet</li>'}</ul><h3>Places</h3><ul>${placeRows || '<li>No picks yet</li>'}</ul></section><section><h3>Qloo picks</h3><h3>Brands</h3><ul>${qlooBrands || '<li>No picks yet</li>'}</ul><h3>Places</h3><ul>${qlooPlaces || '<li>No picks yet</li>'}</ul></section></div>`;
+}
+
+const mean = (values) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+const lastSection = (events, key) => [...(events || [])].reverse().find((event) => event?.t === 'section' && event.key === key);
+
+/** One listing's read for a buyer: where Qloo placed it, how its local favourites and brands score, how much of the room stays. */
+export function listingFit(events = []) {
+  const list = Array.isArray(events) ? events : [];
+  const brief = [...list].reverse().find((event) => event?.t === 'brief') || {};
+  const relax = [...list].reverse().find((event) => event?.t === 'relax');
+  const scores = (key) => (lastSection(list, key)?.items || []).map((item) => finite(item.affinity)).filter((value) => value !== null);
+  const places = scores('places');
+  const rows = [...list].reverse().find((event) => event?.t === 'audit')?.rows || [];
+  return {
+    scope: relax?.to || brief.scope || '',
+    relaxed: relax?.from && relax?.to ? `${relax.from} read as ${relax.to}` : '',
+    places: { mean: mean(places), count: places.length },
+    brands: mean(scores('brands')),
+    kept: rows.filter((row) => row.verdict === 'keep').length,
+    room: rows.length,
+  };
+}
+
+/** Two listings for the same buyer. The local favourites decide: they are the picks that depend most on the place.
+ *  Under 0.005 apart is even, and a listing with fewer than three local favourites is not called. */
+export function compareListings(a = [], b = []) {
+  const left = listingFit(a), right = listingFit(b);
+  const enough = left.places.count >= 3 && right.places.count >= 3;
+  const gap = enough ? right.places.mean - left.places.mean : 0;
+  const names = (events, key) => (lastSection(events, key)?.items || []).map((item) => String(item.name ?? ''));
+  const shared = Object.fromEntries(['brands', 'books', 'playlist', 'places'].map((key) => {
+    const theirs = new Set(names(b, key)), ours = names(a, key);
+    return [key, { shared: ours.filter((name) => theirs.has(name)).length, of: ours.length }];
+  }));
+  return { left, right, enough, winner: enough && Math.abs(gap) >= 0.005 ? (gap > 0 ? 'b' : 'a') : null, shared };
+}
+
+export function renderCompare(compared, diff) {
+  const { left, right } = compared;
+  const name = (fit, fallback) => escapeHtml(fit.scope || fallback);
+  const a = name(left, 'Listing A'), b = name(right, 'Listing B');
+  const best = compared.winner === 'b' ? right : left, other = compared.winner === 'b' ? left : right;
+  const verdict = !compared.enough
+    ? `Too few local favourites to call it: ${left.places.count < 3 ? a : b} has ${Math.min(left.places.count, right.places.count)}.`
+    : compared.winner
+      ? `This buyer fits ${name(best, '')} better: its local favourites score ${score(best.places.mean)} against ${score(other.places.mean)}.`
+      : `About even for this buyer: local favourites score ${score(left.places.mean)} and ${score(right.places.mean)}.`;
+  const rows = [
+    ['Local favourites', (fit) => `${score(fit.places.mean)} <span class="small">${fit.places.count} found</span>`],
+    ['Brands to show', (fit) => score(fit.brands)],
+    ['Room kept', (fit) => fit.room ? `${fit.kept} of ${fit.room}` : 'No room'],
+  ].map(([label, value]) => `<tr><th scope="row">${label}</th><td>${value(left)}</td><td>${value(right)}</td></tr>`).join('');
+  const notes = [left, right].filter((fit) => fit.relaxed).map((fit) => `<p class="small">${escapeHtml(fit.relaxed)}</p>`).join('');
+  const labels = { brands: 'Brands', books: 'Books', playlist: 'Playlist', places: 'Local favourites' };
+  const shared = Object.entries(compared.shared).map(([key, value]) => `${labels[key]} ${value.shared} of ${value.of}`).join(', ');
+  return `<section class="compare-box"><h2>Two listings, one buyer</h2><p class="compare-verdict">${verdict}</p><table class="compare-table"><thead><tr><th></th><th scope="col">${a}</th><th scope="col">${b}</th></tr></thead><tbody>${rows}</tbody></table>${notes}<p class="small">Shared picks: ${shared}</p></section>${renderDiff(diff, 'What moves')}`;
+}
+
+/** The Qloo off answer, read whole. A lost or unreadable answer is asked once more; a refusal the server wrote is not. */
+export async function askPlain(fetchImpl, id, tries = 2) {
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    try {
+      const response = await fetchImpl('/api/plain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+      const events = (await response.text()).split('\n').filter((line) => line.trim()).map((line) => JSON.parse(line));
+      const plain = events.find((event) => event?.t === 'plain');
+      if (plain) return { plain, note: '' };
+      if (events.some((event) => event?.t === 'error')) return { plain: null, note: plainNote(events) };
+    } catch { /* a dropped connection or a page that is not NDJSON: ask once more */ }
+  }
+  return { plain: null, note: 'Qloo off picks did not load. Tap Qloo off to try again.' };
 }

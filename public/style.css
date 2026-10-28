@@ -107,6 +107,13 @@ input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--lin
 .paragraph { line-height: 1.6; white-space: pre-wrap; }
 .error-box { padding: 12px; margin: 12px 0; border-radius: 8px; background: var(--cut); color: var(--cut-ink); }
 .lens-diff { margin-top: 12px; }
+.compare-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-top: 12px; }
+.compare-panel h2 { margin-top: 0; }
+.compare-panel .chip-row { margin: 12px 0 16px; }
+.compare-verdict { font: 600 18px var(--font-display); margin: 8px 0 12px; }
+.compare-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+.compare-table th, .compare-table td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.compare-table thead th { font-size: 12px; }
 .diff-block { border-top: 1px solid var(--line); padding: 12px 0 0; margin-top: 12px; }
 .diff-block h3 { font: 600 17px var(--font-display); }
 .diff-line { margin: 5px 0; font-size: 13px; }
@@ -152,7 +159,7 @@ input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--lin
   .workspace { display: block; }
   #brief-view { display: block !important; }
   .brief-content, .lens-diff { border: 0; padding: 0; }
-  .lens-diff { display: none !important; }
+  .lens-diff, .compare-panel { display: none !important; }
   button { display: none !important; }
   .result-card { break-inside: avoid; }
 }

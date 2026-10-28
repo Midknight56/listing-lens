@@ -86,10 +86,11 @@ describe('Staging Brief render functions', () => {
   it('shows the server own words when the Qloo off tab is refused', () => {
     expect(plainNote([{ t: 'error', text: 'Plain picks did not pass the text check.' }, { t: 'done' }])).toBe('Plain picks did not pass the text check.');
     expect(plainNote([])).toBe('Qloo off picks are not available yet.');
-    // The page reads the refusal's NDJSON instead of throwing on a non 200 answer.
+    // The page reads the refusal's NDJSON (askPlain) instead of throwing on a non 200 answer.
     const app = readFileSync('public/app.js', 'utf8');
-    expect(app).toContain('plainNote(seen)');
-    expect(app).not.toMatch(/fetch\('\/api\/plain'[\s\S]{0,200}!response\.ok/);
+    const render = readFileSync('public/render.js', 'utf8');
+    expect(app).toContain('askPlain(fetch, briefId)');
+    expect(render).not.toMatch(/fetchImpl\('\/api\/plain'[\s\S]{0,300}!response\.ok/);
   });
 
   it('renders lazy thumbnails, and no empty box when a pick has no image', () => {

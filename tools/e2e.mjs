@@ -1,7 +1,8 @@
 // Staging Brief end to end play through. Run through the shared browser lock.
 //   node tools/e2e.mjs [base url]
 import { execSync } from 'node:child_process'
-import { mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { chromium } from 'playwright'
 
 // Optional: --token-file <file with WARM_TOKEN=...> sends the operator header, so test runs skip the per visitor
@@ -12,6 +13,22 @@ function operatorHeaders() {
   const rows = readFileSync(process.argv[at + 1], 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/)
   const line = rows.find((row) => row.startsWith('WARM_TOKEN=')) ?? rows[0]
   return { 'X-Warm-Token': line.replace(/^WARM_TOKEN=/, '').trim().replace(/^"|"$/g, '') }
+}
+
+// Optional: --assets <folder> serves the page files from that folder while the API stays on the host, so a page change
+// is played through before it is deployed.
+async function localAssets(context) {
+  const at = process.argv.indexOf('--assets')
+  if (at < 0) return
+  const dir = process.argv[at + 1]
+  const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.ndjson': 'application/x-ndjson' }
+  await context.route((url) => url.origin === BASE && !/^\/(api|mcp|health)/.test(url.pathname), (route) => {
+    const { pathname } = new URL(route.request().url())
+    const file = path.join(dir, pathname === '/' || pathname.startsWith('/s/') ? 'index.html' : pathname)
+    if (!existsSync(file)) return route.continue()
+    return route.fulfill({ status: 200, contentType: types[path.extname(file)] || 'application/octet-stream', body: readFileSync(file) })
+  })
+  console.log(`page files from ${dir}`)
 }
 
 const BASE = (process.argv.slice(2).find((arg) => arg.startsWith('http')) ?? 'http://127.0.0.1:8787').replace(/\/$/, '')
@@ -46,6 +63,7 @@ async function main() {
   mkdirSync('out', { recursive: true })
   const browser = await chromium.launch({ headless: true })
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'], extraHTTPHeaders: operatorHeaders() })
+  await localAssets(context)
   const page = await context.newPage()
   const errors = []
   const stageBodies = []
@@ -106,11 +124,34 @@ async function main() {
     // When the day's writing allowance is spent the tab says so calmly instead; the detail says which case ran.
     await page.waitForFunction(() => {
       const text = document.querySelector('#plain-content')?.textContent || ''
-      return document.querySelector('#plain-content li') || /spent for today|not available/i.test(text)
+      return document.querySelector('#plain-content li') || /spent for today|not available|did not load|did not pass|unavailable|twice today/i.test(text)
     }, null, { timeout: 120000 })
     const plainText = await page.locator('#plain-content').innerText()
     const picks = /Brands/.test(plainText) && /Places/.test(plainText)
     check('Qloo off renders plain picks, or says calmly that writing is spent', picks || /spent for today/i.test(plainText), picks ? 'picks shown' : plainText.slice(0, 80))
+
+    // Two listings, one buyer: the same lens on a second example home replays its recording and compares the two.
+    await page.locator('[data-tab="brief"]').click()
+    const lensBefore = stageBodies.at(-1)?.lens?.label
+    const stagesBefore = stageBodies.length
+    await page.locator('#compare-chips .chip').filter({ hasText: 'Wicker Park' }).click()
+    await page.locator('#lens-diff .compare-box').waitFor({ timeout: 120000 })
+    const second = stageBodies.at(-1), secondEvents = await stageStreams.at(-1)
+    check('a second listing keeps the buyer and runs the other example home', stageBodies.length === stagesBefore + 1 && second?.preset === 'wicker-park' && second?.lens?.label === lensBefore, `${second?.preset} ${second?.lens?.label}`)
+    check('the second listing of an example pair costs no fresh run', ['replay', 'cache'].includes(secondEvents.find((event) => event.t === 'run')?.mode), secondEvents.find((event) => event.t === 'run')?.mode)
+    const verdictLine = await page.locator('.compare-verdict').innerText()
+    check('the comparison names a fit for this buyer', /fits .+ better|About even|Too few local favourites/.test(verdictLine), verdictLine)
+    check('the comparison shows what moves between the listings', await page.locator('#lens-diff').getByText('What moves').count() === 1 && await page.locator('.compare-table th[scope="col"]').count() === 2)
+    check('the brief and the form now show the second listing', /Wicker Park/.test(await page.locator('.scope-line').innerText()) && await page.locator('#neighbourhood').inputValue() === 'Wicker Park')
+    await page.screenshot({ path: 'out/e2e-two-listings.png', fullPage: true })
+
+    // Bad path: Compare with no city asks for one and sends nothing.
+    await page.locator('#compare-city').fill('')
+    await page.locator('#compare-neighbourhood').fill('')
+    const stagesBeforeEmpty = stageBodies.length
+    await page.locator('#compare-button').click()
+    const emptyCompare = await calmError(page)
+    check('Compare with no city asks for one and starts no run', /Add a city for the second listing/.test(emptyCompare) && stageBodies.length === stagesBeforeEmpty, emptyCompare)
 
     // Bad path: an unknown city remains calm and does not damage the page.
     await page.goto(BASE + '/')

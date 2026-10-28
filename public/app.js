@@ -1,4 +1,4 @@
-import { diffBriefs, modeLabel, plainNote, renderBrief, renderDiff, renderPlain, runSummary } from './render.js';
+import { askPlain, compareListings, diffBriefs, modeLabel, renderBrief, renderCompare, renderDiff, renderPlain, runSummary } from './render.js';
 
 const $ = (s) => document.querySelector(s);
 const form = $('#stage-form');
@@ -24,6 +24,10 @@ const plainView = $('#plain-view');
 const briefView = $('#brief-view');
 const featureNode = $('#feature-list');
 const formDetails = $('#form-details');
+const comparePanel = $('#compare-panel');
+const compareChips = $('#compare-chips');
+const compareCity = $('#compare-city');
+const compareNeighbourhood = $('#compare-neighbourhood');
 
 const FEATURES = ['natural light', 'open kitchen', 'front porch', 'home office', 'garden', 'fireplace', 'hardwood floors', 'walk in closet', 'updated bath', 'big windows', 'high ceilings', 'patio', 'workshop', 'reading nook'];
 let catalogue = { presets: [], lenses: [], features: FEATURES };
@@ -38,6 +42,7 @@ let busy = false;
 let currentLens = null;
 let otherLens = null;
 let plainEvent = null;
+let comparePick = null;
 
 const localPresets = [
   { label: 'Design forward', city: 'Nashville', neighbourhood: 'East Nashville', hint: 'Warm craft and local finds', lens: { label: 'Design forward', anchors: ['Herman Miller', 'Kinfolk', 'Khruangbin'] }, room: ['IKEA', 'Pottery Barn', 'West Elm', 'CB2'] },
@@ -115,7 +120,7 @@ function collectRequest() {
 }
 function resetRun() {
   activeEvents = []; plainEvent = null; plainContent.replaceChildren(); runLines.replaceChildren(); runSummaryNode.textContent = 'Run log'; runLog.open = true; errorBox.hidden = true; errorBox.textContent = '';
-  briefContent.innerHTML = '<p class="empty-note">Building the brief…</p>'; modeBadge.hidden = true; diffBox.hidden = true; diffBox.replaceChildren();
+  briefContent.innerHTML = '<p class="empty-note">Building the brief…</p>'; modeBadge.hidden = true; diffBox.hidden = true; diffBox.replaceChildren(); comparePanel.hidden = true;
 }
 function logEvent(event) {
   if (event.t === 'done') return;
@@ -154,6 +159,7 @@ function handleEvent(event) {
     shareButton.hidden = !briefId; printButton.hidden = false;
     lensToggle.hidden = true;
     if (otherLens) lensToggle.textContent = `See it for ${otherLens.label}`;
+    drawCompare();
   }
 }
 async function readNdjson(response, callback) {
@@ -212,6 +218,44 @@ async function flipLens() {
   } else requestState = originalRequest;
 }
 lensToggle.addEventListener('click', flipLens);
+// Same buyer, another listing: the other example homes (each recorded with both lenses, so the pair replays at no cost),
+// or a typed place that is a fresh run inside the visitor's daily cap.
+function drawCompare() {
+  comparePick = null; compareChips.replaceChildren();
+  catalogue.presets.filter((item) => item.id && item.id !== requestState?.preset).forEach((item) => {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'chip'; button.setAttribute('aria-pressed', 'false');
+    button.textContent = item.neighbourhood ? `${item.neighbourhood}, ${item.city}` : item.city;
+    button.addEventListener('click', () => { comparePick = item; compareCity.value = item.city; compareNeighbourhood.value = item.neighbourhood || ''; compareListing(); });
+    compareChips.append(button);
+  });
+  comparePanel.hidden = false;
+}
+function showRequest(request, other) {
+  selectedPreset = other?.id || null; selectedPresetData = other || null; city.value = request.city; neighbourhood.value = request.neighbourhood || '';
+  room = [...request.room]; drawRooms(); drawLenses(); drawPresets();
+  const selected = new Set(request.features || []); featureNode.querySelectorAll('input').forEach((input) => { input.checked = selected.has(input.value); });
+}
+async function compareListing() {
+  if (!briefId || !requestState || busy) return;
+  const other = comparePick;
+  const typedCity = compareCity.value.trim();
+  if (!other && typedCity.length < 2) { errorBox.textContent = 'Add a city for the second listing.'; errorBox.hidden = false; return; }
+  const first = activeEvents.slice(); const firstRequest = requestState;
+  const { preset: _ignored, ...custom } = firstRequest;
+  const second = other
+    ? { city: other.city, neighbourhood: other.neighbourhood || '', lens: firstRequest.lens, room: [...(other.room || [])], features: [...(other.features || [])], preset: other.id }
+    : { ...custom, city: typedCity, neighbourhood: compareNeighbourhood.value.trim() };
+  requestState = second; baselineEvents = null; activeEvents = []; runLines.replaceChildren(); runSummaryNode.textContent = 'Run log'; runLog.open = true; errorBox.hidden = true;
+  await postRun('/api/stage', second, { reset: false });
+  if (activeEvents.some((event) => event.t === 'done') && activeEvents.some((event) => event.t === 'brief')) {
+    showRequest(second, other);
+    diffBox.innerHTML = renderCompare(compareListings(first, activeEvents), diffBriefs(first, activeEvents)); diffBox.hidden = false;
+  } else {
+    requestState = firstRequest; activeEvents = first; briefContent.innerHTML = renderBrief(first, otherLens?.label || '', []);
+  }
+}
+$('#compare-button').addEventListener('click', () => { comparePick = null; compareListing(); });
+[compareCity, compareNeighbourhood].forEach((input) => input.addEventListener('input', () => { comparePick = null; }));
 briefContent.addEventListener('click', (event) => { if (event.target.closest('[data-lens-switch]')) flipLens(); });
 document.querySelectorAll('[data-tab]').forEach((button) => button.addEventListener('click', async () => {
   const plain = button.dataset.tab === 'plain';
@@ -219,17 +263,10 @@ document.querySelectorAll('[data-tab]').forEach((button) => button.addEventListe
   briefView.hidden = plain; plainView.hidden = !plain;
   if (plain && briefId && !plainEvent && !busy) {
     plainContent.textContent = 'Asking the same model with no Qloo';
-    try {
-      const response = await fetch('/api/plain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: briefId }) });
-      // A refusal comes as NDJSON too, so the server's own words show (a spent budget, a failed check).
-      if (!response.body) throw new Error();
-      const seen = [];
-      await readNdjson(response, (event) => {
-        seen.push(event);
-        if (event.t === 'plain') { plainEvent = event; plainContent.innerHTML = renderPlain(event, activeEvents); }
-      });
-      if (!plainEvent) plainContent.textContent = plainNote(seen);
-    } catch { plainContent.textContent = 'Qloo off picks are not available yet.'; }
+    // A refusal comes as NDJSON too, so the server's own words show (a spent budget, a failed check); a lost answer is asked once more.
+    const answer = await askPlain(fetch, briefId);
+    if (answer.plain) { plainEvent = answer.plain; plainContent.innerHTML = renderPlain(plainEvent, activeEvents); }
+    else plainContent.textContent = answer.note;
   }
 }));
 async function loadShared(id) {
