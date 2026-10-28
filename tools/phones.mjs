@@ -1,7 +1,8 @@
 // Check the empty page and an East Nashville brief at phone and tablet widths.
 //   node tools/phones.mjs [base url]
 import { execSync } from 'node:child_process'
-import { mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { chromium } from 'playwright'
 
 // Optional: --token-file <file with WARM_TOKEN=...> sends the operator header, so test runs skip the per visitor
@@ -15,6 +16,21 @@ function operatorHeaders() {
 }
 
 const BASE = (process.argv.slice(2).find((arg) => arg.startsWith('http')) ?? 'http://127.0.0.1:8787').replace(/\/$/, '')
+// Optional: --assets <folder> serves the page files from that folder while the API stays on the host, so a page change
+// is measured before it is deployed.
+async function localAssets(context) {
+  const at = process.argv.indexOf('--assets')
+  if (at < 0) return
+  const dir = process.argv[at + 1]
+  const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
+  await context.route((url) => url.origin === BASE && !/^\/(api|mcp|health)/.test(url.pathname), (route) => {
+    const { pathname } = new URL(route.request().url())
+    const file = path.join(dir, pathname === '/' || pathname.startsWith('/s/') ? 'index.html' : pathname)
+    if (!existsSync(file)) return route.continue()
+    return route.fulfill({ status: 200, contentType: types[path.extname(file)] || 'application/octet-stream', body: readFileSync(file) })
+  })
+}
+
 const WIDTHS = [320, 344, 360, 375, 390, 393, 402, 412, 420, 440, 466, 669, 707, 820, 1280]
 const failures = []
 
@@ -77,6 +93,7 @@ async function main() {
   try {
     for (const width of WIDTHS) {
       const context = await browser.newContext({ viewport: { width, height: width > 600 ? 1024 : 800 }, deviceScaleFactor: 2, isMobile: width < 600, hasTouch: width < 600, extraHTTPHeaders: operatorHeaders() })
+      await localAssets(context)
       const page = await context.newPage()
       await page.goto(BASE + '/')
       await page.locator('.preset-card').first().waitFor({ timeout: 15000 })
