@@ -258,8 +258,12 @@ async function compareListing() {
   if (!other && typedCity.length < 2) { errorBox.textContent = 'Add a city for the second listing.'; errorBox.hidden = false; return; }
   const first = activeEvents.slice(); const firstRequest = requestState;
   const { preset: _ignored, ...custom } = firstRequest;
+  // The example is named only when this buyer is one of its two recorded lenses: a capped visitor then gets that recording,
+  // never a recording of another buyer.
+  const sameLens = (lens) => lens?.label === firstRequest.lens?.label && (lens?.anchors || []).join('|') === (firstRequest.lens?.anchors || []).join('|');
+  const recorded = Boolean(other) && [other.lens, other.flip].some(sameLens);
   const second = other
-    ? { city: other.city, neighbourhood: other.neighbourhood || '', lens: firstRequest.lens, room: [...(other.room || [])], features: [...(other.features || [])], preset: other.id }
+    ? { city: other.city, neighbourhood: other.neighbourhood || '', lens: firstRequest.lens, room: [...(other.room || [])], features: [...(other.features || [])], ...(recorded ? { preset: other.id } : {}) }
     : { ...custom, city: typedCity, neighbourhood: compareNeighbourhood.value.trim() };
   requestState = second; baselineEvents = null; activeEvents = []; runLines.replaceChildren(); runSummaryNode.textContent = 'Run log'; runLog.open = true; errorBox.hidden = true;
   await postRun('/api/stage', second, { reset: false });

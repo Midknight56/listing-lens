@@ -66,7 +66,8 @@ describe('two listings, one buyer', () => {
     const page = readFileSync('public/index.html', 'utf8');
     expect(page).toContain('id="compare-panel"');
     expect(page).toContain('Same buyer, another listing');
-    expect(app).toMatch(/preset: other\.id/);
+    expect(app).toMatch(/recorded \? \{ preset: other\.id \}/);
+    expect(app).toContain('[other.lens, other.flip].some(sameLens)');
     expect(app).toContain('renderCompare(compareListings(');
   });
 });
