@@ -6,6 +6,17 @@ also like near that home, then comes back with a room audit, a short shopping an
 
 Try it: https://listing-lens.midknight-labs.workers.dev
 
+> **Judge in 60 seconds.** No sign in. The six examples are recorded, so each opens in about a second.
+>
+> 1. Tap **East Nashville**. Read the room audit: keep, swap or cut for each brand in the room, with Qloo's score.
+> 2. Tap **Classic comfort** in the brief. The same home for a different buyer, and a list of what moved.
+> 3. Under **Same buyer, another listing**, tap **Wicker Park, Chicago**. The page says which home fits this buyer
+>    and what moves between the two places.
+> 4. Tap **Qloo off**. The same writer with no taste data, each pick looked up in Qloo.
+> 5. **Print for the homeowner** gives the one page plan a stager hands the seller, with no scores on it.
+>
+> Built new for this contest: the first commit is dated 25 Oct 2026.
+
 ## What a run looks like
 
 1. Pick an example, say East Nashville with the Design forward lens (Herman Miller, Kinfolk, Khruangbin), a room of
@@ -24,6 +35,12 @@ Try it: https://listing-lens.midknight-labs.workers.dev
 7. Flip the lens to Classic comfort and the page shows what changed.
 8. "Qloo off" asks the same writer for picks with no taste data, then looks each one up in Qloo. You see which picks
    Qloo knows and how they score.
+9. "Same buyer, another listing" runs the same lens on a second home. The page names the home whose local favourites
+   score higher for this buyer, counts the picks the two places share, and lists what moves. Two example homes replay
+   their recordings, so the comparison costs nothing; a typed place is one of the visitor's three fresh runs.
+10. "Print for the homeowner" prints one page for the seller: what stays, what changes, what comes in, and the listing
+    paragraph, under the stager's name, with no scores. "Copy style link" saves a named lens (a brokerage's house
+    style) in a link; opening the link selects it. Nothing is stored and there are no accounts.
 
 ## How it uses Qloo
 
