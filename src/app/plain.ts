@@ -2,7 +2,7 @@ import { scanText } from "../fairhousing";
 import { neuronsFor, type TextWriter } from "../agent/model";
 import type { Entity, QlooClient } from "../qloo/client";
 import { NeuronLedger } from "../store/d1";
-import { DEFAULT_ACCOUNT_NEURONS, DEFAULT_DAILY_NEURONS } from "../limits";
+import { DEFAULT_ACCOUNT_NEURONS, DEFAULT_DAILY_NEURONS, visitorCaps } from "../limits";
 import { brief, send, type StageEnv } from "./stage";
 
 interface PlainIdeas {
@@ -80,7 +80,12 @@ export async function plain(
   const response = await brief(body.id, env);
   if (!response.ok) return fail("That saved brief is not available.", 404);
   if (deps.count && !(await deps.count("plain", request)))
-    return fail("You have opened the plain tab twice today.", 429);
+    return fail(
+      visitorCaps().plain === 2
+        ? "You have opened the plain tab twice today."
+        : `You have opened the plain tab ${visitorCaps().plain} times today.`,
+      429,
+    );
   if (!deps.writer) return fail("Plain writing is off right now.");
   const saved = (await response.json()) as {
     request: {

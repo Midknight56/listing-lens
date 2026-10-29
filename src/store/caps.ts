@@ -1,9 +1,8 @@
 import {
-  DAILY_FRESH_RUNS_PER_VISITOR,
   DAILY_QLOO_CALLS,
-  DAILY_QLOO_CALLS_PER_VISITOR,
-  DAILY_PLAIN_PER_VISITOR,
   MAX_RUN_QLOO_CALLS,
+  now,
+  visitorCaps,
 } from "../limits";
 
 export interface CounterStore {
@@ -20,7 +19,7 @@ export function counterKey(key: string): { name: string; day: string } {
 export class VisitorCaps {
   constructor(
     private store: CounterStore,
-    private day: () => string = () => new Date().toISOString().slice(0, 10),
+    private day: () => string = () => new Date(now()).toISOString().slice(0, 10),
   ) {}
   private key(kind: string, visitor?: string): string {
     return [this.day(), kind, visitor ?? "all"].join(":");
@@ -33,12 +32,12 @@ export class VisitorCaps {
     return true;
   }
   fresh(visitor: string): Promise<boolean> {
-    return this.take(this.key("fresh", visitor), DAILY_FRESH_RUNS_PER_VISITOR);
+    return this.take(this.key("fresh", visitor), visitorCaps().fresh);
   }
   qloo(visitor: string): Promise<boolean> {
     return this.take(
       this.key("visitor-qloo", visitor),
-      DAILY_QLOO_CALLS_PER_VISITOR,
+      visitorCaps().qloo,
     ).then(
       async (ok) =>
         ok && (await this.take(this.key("daily-qloo"), DAILY_QLOO_CALLS)),
@@ -50,7 +49,7 @@ export class VisitorCaps {
     return this.take(this.key("daily-qloo"), DAILY_QLOO_CALLS);
   }
   plain(visitor: string): Promise<boolean> {
-    return this.take(this.key("plain", visitor), DAILY_PLAIN_PER_VISITOR);
+    return this.take(this.key("plain", visitor), visitorCaps().plain);
   }
 }
 export class RunCallBudget {

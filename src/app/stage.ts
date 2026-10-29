@@ -1,5 +1,5 @@
 import { scanInput } from "../fairhousing";
-import { DEFAULT_ACCOUNT_NEURONS, DEFAULT_DAILY_NEURONS } from "../limits";
+import { DEFAULT_ACCOUNT_NEURONS, DEFAULT_DAILY_NEURONS, visitorCaps } from "../limits";
 import { run, type StageRequest } from "../agent/run";
 import type { Event } from "../agent/events";
 import type { QlooClient } from "../qloo/client";
@@ -218,7 +218,8 @@ export async function stage(
         { t: "run", id: crypto.randomUUID(), mode: "off" },
         {
           t: "error",
-          text: "You have staged three briefs today. Try again tomorrow or open an example.",
+          text: `You have staged ${visitorCaps().fresh === 3 ? "three" : visitorCaps().fresh} briefs today. ` +
+            "Try again tomorrow or open an example.",
         },
         { t: "done" },
       ],

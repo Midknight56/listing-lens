@@ -5,6 +5,7 @@ import { plain, PLAIN_PROMPT } from "../../src/app/plain";
 import { BriefStore } from "../../src/store/d1";
 import type { Entity, QlooClient } from "../../src/qloo/client";
 import { FakeD1 } from "./fake-d1";
+import { setClockForTest } from "../../src/limits";
 
 function entity(
   id: string,
@@ -67,6 +68,59 @@ function post(value: unknown): Request {
     body: JSON.stringify(value),
   });
 }
+
+describe("judging window refusal text", () => {
+  it("uses the fresh run cap in the refusal text", async () => {
+    const db = new FakeD1();
+    try {
+      for (const [date, wording] of [
+        ["2026-11-01T12:00:00Z", "three briefs"],
+        ["2026-11-03T12:00:00Z", "12 briefs"],
+      ]) {
+        setClockForTest(() => Date.parse(date));
+        const response = await stage(
+          post({ city: "Test City", lens: { label: "Design forward", anchors: ["Test Anchor"] }, room: [], features: [] }),
+          { DB: db, SESSION_SECRET: "synthetic-secret" },
+          { qloo: dependencies().qloo, count: async () => false },
+        );
+        expect(response.status).toBe(429);
+        expect(await response.text()).toContain(wording);
+      }
+    } finally {
+      setClockForTest();
+      db.close();
+    }
+  });
+
+  it("uses the plain tab cap in the refusal text", async () => {
+    const db = new FakeD1();
+    const id = "00000000-0000-4000-8000-000000000003";
+    try {
+      await new BriefStore(db).save(
+        id,
+        { city: "Test City", lens: { label: "Design forward", anchors: ["Test Anchor"] }, room: [], features: [] },
+        [{ t: "brief", intro: "Test", paragraph: "Test", written_by: "template", scope: "Test City", lens: "Design forward" }],
+        "live",
+      );
+      for (const [date, wording] of [
+        ["2026-11-01T12:00:00Z", "twice today"],
+        ["2026-11-03T12:00:00Z", "8 times today"],
+      ]) {
+        setClockForTest(() => Date.parse(date));
+        const response = await plain(
+          new Request("https://listing-lens.test/api/plain", { method: "POST", body: JSON.stringify({ id }) }),
+          { DB: db },
+          { qloo: dependencies().qloo, count: async () => false },
+        );
+        expect(response.status).toBe(429);
+        expect(await response.text()).toContain(wording);
+      }
+    } finally {
+      setClockForTest();
+      db.close();
+    }
+  });
+});
 
 describe("run recording", () => {
   it("does not save or cache a failed run", async () => {

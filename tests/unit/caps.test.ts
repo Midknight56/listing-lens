@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { setClockForTest } from "../../src/limits";
 import { counterKey, VisitorCaps, RunCallBudget } from "../../src/store/caps";
 import { NeuronLedger } from "../../src/store/d1";
 import { FakeD1 } from "./fake-d1";
@@ -16,6 +17,35 @@ class MemoryCounters {
 }
 
 describe("daily limits", () => {
+  afterEach(() => setClockForTest());
+  it("uses normal visitor caps outside the judging window", async () => {
+    for (const at of ["2026-11-01T12:00:00Z", "2026-11-07T00:00:00Z"]) {
+      setClockForTest(() => Date.parse(at));
+      const caps = new VisitorCaps(new MemoryCounters());
+      for (let i = 0; i < 3; i++) expect(await caps.fresh("v" + at)).toBe(true);
+      expect(await caps.fresh("v" + at)).toBe(false);
+      for (let i = 0; i < 48; i++) expect(await caps.qloo("q" + at)).toBe(true);
+      expect(await caps.qloo("q" + at)).toBe(false);
+      for (let i = 0; i < 2; i++) expect(await caps.plain("p" + at)).toBe(true);
+      expect(await caps.plain("p" + at)).toBe(false);
+    }
+  });
+  it("uses raised visitor caps during the judging window and its exact end", async () => {
+    for (const at of ["2026-11-02T00:00:00Z", "2026-11-05T23:00:00Z", "2026-11-06T11:59:00Z"]) {
+      setClockForTest(() => Date.parse(at));
+      const caps = new VisitorCaps(new MemoryCounters());
+      for (let i = 0; i < 12; i++) expect(await caps.fresh("v" + at)).toBe(true);
+      expect(await caps.fresh("v" + at)).toBe(false);
+      for (let i = 0; i < 192; i++) expect(await caps.qloo("q" + at)).toBe(true);
+      expect(await caps.qloo("q" + at)).toBe(false);
+      for (let i = 0; i < 8; i++) expect(await caps.plain("p" + at)).toBe(true);
+      expect(await caps.plain("p" + at)).toBe(false);
+    }
+    setClockForTest(() => Date.parse("2026-11-06T12:00:00Z"));
+    const after = new VisitorCaps(new MemoryCounters());
+    for (let i = 0; i < 3; i++) expect(await after.fresh("after")).toBe(true);
+    expect(await after.fresh("after")).toBe(false);
+  });
   it("uses the counter name as the durable object key and day as its counter", () => {
     expect(counterKey("2026-10-25:visitor-qloo:visitor-hash")).toEqual({
       day: "2026-10-25",
@@ -35,6 +65,7 @@ describe("daily limits", () => {
     expect(await caps.qloo("visitor")).toBe(false);
   });
   it("allows 500 Qloo questions across all visitors", async () => {
+    setClockForTest(() => Date.parse("2026-11-03T12:00:00Z"));
     const counters = new MemoryCounters(),
       caps = new VisitorCaps(counters, () => "day");
     for (let i = 0; i < 500; i++)

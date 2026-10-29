@@ -127,7 +127,7 @@ async function main() {
     // When the day's writing allowance is spent the tab says so calmly instead; the detail says which case ran.
     await page.waitForFunction(() => {
       const text = document.querySelector('#plain-content')?.textContent || ''
-      return document.querySelector('#plain-content li') || /spent for today|not available|did not load|did not pass|unavailable|twice today/i.test(text)
+      return document.querySelector('#plain-content li') || /spent for today|not available|did not load|did not pass|unavailable|twice today|times today/i.test(text)
     }, null, { timeout: 120000 })
     const plainText = await page.locator('#plain-content').innerText()
     const picks = /Brands/.test(plainText) && /Places/.test(plainText)

@@ -36,8 +36,9 @@ Try it: https://listing-lens.midknight-labs.workers.dev
 8. "Qloo off" asks the same writer for picks with no taste data, then looks each one up in Qloo. You see which picks
    Qloo knows and how they score.
 9. "Same buyer, another listing" runs the same lens on a second home. The page names the home whose local favourites
-   score higher for this buyer, counts the picks the two places share, and lists what moves. Two example homes replay
-   their recordings, so the comparison costs nothing; a typed place is one of the visitor's three fresh runs.
+   score higher for this buyer, counts the picks the two places share, and lists what moves. Two example homes
+   replay their recordings, so the comparison costs nothing; a typed place is one of the visitor's fresh runs (3 a
+   day, 12 a day from 2 to 5 Nov for judging).
 10. "Print for the homeowner" prints one page for the seller: what stays, what changes, what comes in, and the listing
     paragraph, under the stager's name, with no scores. "Copy style link" saves a named lens (a brokerage's house
     style) in a link; opening the link selects it. Nothing is stored and there are no accounts.
@@ -73,10 +74,13 @@ Each limit is set so the app costs nothing to run.
 | Limit | Value | Why it is safe |
 | --- | --- | --- |
 | Qloo calls a day, all visitors | 500 | 500 x 27 days = 13,500, 27% of the key's 50,000 a month |
-| Qloo calls a day, one visitor | 48 | 3 fresh runs x 16 calls a run |
-| Fresh runs a day, one visitor | 3 | Examples replay a recorded run for free after that |
+| Qloo calls a day, one visitor | 48 (192 from 2 to 5 Nov) | fresh runs x 16 calls a run |
+| Fresh runs a day, one visitor | 3 (12 from 2 to 5 Nov, for judging) | Examples replay a recorded run for free after that |
+| Qloo off tab a day, one visitor | 2 (8 from 2 to 5 Nov) | One writing call each, inside the app's 450 neurons |
 | Writing a day, this app | 450 neurons | Inside a 9,500 shared allowance, under Cloudflare's free 10,000 neurons a day |
 | Monthly Qloo floor | 3,000 calls left | Below it, no live calls; examples replay |
+
+From 2 to 5 Nov the limits for one visitor are raised for judging; the totals for the whole app stay the same, so the cost stays at $0.
 
 A run that cannot go live (a limit, the floor, or Qloo not answering) replays the example's recorded brief and shows
 the date it was recorded.
@@ -120,7 +124,7 @@ npx playwright install chromium
 node tools/e2e.mjs http://127.0.0.1:8787 --token-file .dev.vars
 ```
 
-The play through makes more than the 3 fresh briefs a visitor gets each day. `--token-file` sends your `WARM_TOKEN`, so the
+The play through makes more than the fresh briefs a visitor gets each day. `--token-file` sends your `WARM_TOKEN`, so the
 test skips the visitor limit. The daily totals still apply.
 
 ```bash
