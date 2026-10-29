@@ -43,6 +43,13 @@ const inventedDrafts = [
 ];
 
 describe("backend copy and scoring rules", () => {
+  it("capitalizes the feature lead and matches its verb to the feature count", () => {
+    const multiple = composeTemplate({ scope: "Seattle", places: [], features: ["natural light", "hardwood floors"] }).paragraph;
+    const single = composeTemplate({ scope: "Seattle", places: [], features: ["natural light"] }).paragraph;
+    expect(multiple).toMatch(/^Natural light and hardwood floors give the home an easy sense of flow\./);
+    expect(single).toMatch(/^Natural light gives the home an easy sense of flow\./);
+  });
+
   it("accepts ten clean drafts and rejects ten invented names", () => {
     const facts = ["Halifax", "Test Cafe", "natural light"];
     for (const draft of cleanDrafts)
@@ -182,6 +189,48 @@ describe("backend copy and scoring rules", () => {
       why: "Qloo read Old Quarter as Test City; using Test City",
     });
     expect(events.find((event) => event.t === "brief")?.scope).toBe("Test City");
+  });
+
+  it("notes when Qloo reads a typed city as another city", async () => {
+    const events: StageEvent[] = [];
+    const qloo = {
+      search: async () => ({ results: [{ id: "anchor", name: "One", type: "brand", tags: [] }], cached: false }),
+      insights: async ({ type }: { type: string }) => ({
+        cached: false,
+        locality: { id: "wrong-city", name: "Lüneburg", disambiguation: "Lüneburg, Lower Saxony, Germany" },
+        results: [1, 2, 3].map((n) => ({ id: `${type}-${n}`, name: `Sample ${n}`, type, tags: [] })),
+      }),
+      quotaLeft: async () => 40000,
+    };
+    await run({ city: "Lunenburg", lens: { label: "Design forward", anchors: ["One"] }, room: [], features: [] },
+      { qloo: qloo as never, budget: { reserve: async () => null }, emit: async (event) => { events.push(event); } });
+    const relax = events.find((event) => event.t === "relax");
+    expect(relax?.why).toContain("Lüneburg, Lower Saxony, Germany");
+    expect(relax?.why).toContain("Add the state or province");
+
+    const chicagoEvents: StageEvent[] = [];
+    const chicago = { ...qloo, insights: async ({ type }: { type: string }) => ({
+      cached: false, locality: { id: "right-city", name: "Chicago", disambiguation: "Chicago, Cook County, Illinois, United States" },
+      results: [1, 2, 3].map((n) => ({ id: `${type}-${n}`, name: `Sample ${n}`, type, tags: [] })),
+    }) };
+    await run({ city: "Chicago", lens: { label: "Design forward", anchors: ["One"] }, room: [], features: [] },
+      { qloo: chicago as never, budget: { reserve: async () => null }, emit: async (event) => { chicagoEvents.push(event); } });
+    expect(chicagoEvents.some((event) => event.t === "relax")).toBe(false);
+  });
+
+  it("skips locality results when resolving loves", async () => {
+    const events: StageEvent[] = [];
+    const qloo = {
+      search: async (query: string) => ({ cached: false, results: query === "Patagonia"
+        ? [{ id: "locality", name: "Patagonia", type: "locality", tags: [] }, { id: "brand", name: "Patagonia", type: "brand", tags: [] }]
+        : [{ id: "brand", name: query, type: "brand", tags: [] }] }),
+      insights: async ({ type }: { type: string }) => ({ cached: false, locality: null,
+        results: [1, 2, 3].map((n) => ({ id: `${type}-${n}`, name: `Sample ${n}`, type, tags: [] })) }),
+      quotaLeft: async () => 40000,
+    };
+    await run({ city: "Chicago", lens: { label: "Design forward", anchors: ["Patagonia"] }, room: [], features: [] },
+      { qloo: qloo as never, budget: { reserve: async () => null }, emit: async (event) => { events.push(event); } });
+    expect(events.find((event) => event.t === "resolved" && event.kind === "anchor")).toMatchObject({ as: "Patagonia (brand)" });
   });
 
   it("asks again at city level for one list that is empty in the neighbourhood", async () => {
@@ -619,14 +668,14 @@ describe("backend copy and scoring rules", () => {
         features: [...picked, ...picked],
       }).paragraph;
       for (const feature of features) {
-        expect(copy.includes(feature)).toBe(picked.includes(feature));
+        expect(copy.toLocaleLowerCase().includes(feature)).toBe(picked.includes(feature));
         if (picked.includes(feature)) {
-          expect(copy.split(feature)).toHaveLength(2);
+          expect(copy.toLocaleLowerCase().split(feature)).toHaveLength(2);
         }
       }
       expect(scanText(copy)).toEqual([]);
       if (picked.length >= 2) expect(copy).toContain(" and ");
-      expect(copy.match(/natural light/g)?.length ?? 0).toBe(
+      expect(copy.match(/natural light/gi)?.length ?? 0).toBe(
         picked.includes("natural light") ? 1 : 0,
       );
       expect(copy).toContain("Around East Nashville");

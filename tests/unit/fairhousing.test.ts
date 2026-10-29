@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { scanInput, scanText, setScanEnabledForTest } from '../../src/fairhousing'
 import { composeTemplate } from '../../src/agent/template'
+import { stage } from '../../src/app/stage'
 
 afterEach(() => setScanEnabledForTest(true))
 describe('fair housing scan', () => {
@@ -23,6 +24,14 @@ describe('fair housing scan', () => {
   })
   it('scans free text fields in the request', () => {
     expect(scanInput({ city: 'Boston', lens: { label: 'Family home', anchors: ['Kinfolk'] }, room: [] })).toContain('family')
+  })
+  it('names a caught word in the refusal message', async () => {
+    const response = await stage(new Request('https://example.test/stage', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ city: 'Boston', lens: { label: 'Classic comfort', anchors: ['Kinfolk'] }, room: ['La-Z-Boy'] }),
+    }), { SESSION_SECRET: 'test', DB: {} as never }, { qloo: {} as never })
+    const [error] = (await response.text()).trim().split('\n').map((line) => JSON.parse(line))
+    expect(error.text).toContain('"boy"')
   })
   it('keeps every feature combination up to size three clear in template copy', () => {
     const features = ['natural light', 'open kitchen', 'front porch', 'home office', 'garden', 'fireplace', 'hardwood floors', 'walk in closet', 'updated bath', 'big windows', 'high ceilings', 'patio', 'workshop', 'reading nook']

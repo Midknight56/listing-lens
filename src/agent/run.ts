@@ -432,9 +432,9 @@ export async function run(
   try {
     for (const name of request.lens.anchors.slice(0, 3)) {
       const result = await call("/search", name, () =>
-        deps.qloo.search(name, undefined, 1),
+        deps.qloo.search(name, undefined, 3),
       );
-      const hit = result.results[0];
+      const hit = result.results.find((item) => item.type !== "locality");
       if (hit) {
         anchors.push({ id: hit.id, name });
         await emit({
@@ -530,6 +530,20 @@ export async function run(
           take: 10,
         }),
       );
+    }
+    if (
+      scope === request.city &&
+      brandAnswer.locality &&
+      wrongCity(brandAnswer.locality.disambiguation, request.city)
+    ) {
+      await emit({
+        t: "relax",
+        from: request.neighbourhood ?? "",
+        to: request.city,
+        why: `Qloo read ${request.city} as ${
+          brandAnswer.locality.disambiguation
+        }. Add the state or province to the city if that is not the place.`,
+      });
     }
     if (brandAnswer.locality) {
       await emit({

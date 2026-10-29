@@ -22,7 +22,9 @@ export function composeTemplate(facts: BriefFacts): {
   const vicinity = `Around ${facts.scope}`;
   const intro = `A considered staging brief for ${facts.scope}.`;
   const lead = chosen.length
-    ? `${features} give the home an easy sense of flow.`
+    ? `${features[0].toLocaleUpperCase()}${features.slice(1)} ${
+        chosen.length === 1 ? "gives" : "give"
+      } the home an easy sense of flow.`
     : "A considered layout gives the home an easy sense of flow.";
   const paragraph = [
     `${lead} ${vicinity}, ${placeText} add a local touch.`,

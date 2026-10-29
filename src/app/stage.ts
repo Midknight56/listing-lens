@@ -100,7 +100,9 @@ function parse(raw: unknown): StageRequest | string {
   if (typeof data.preset === "string") request.preset = data.preset;
   const banned = scanInput(request);
   return banned.length
-    ? "Please remove a phrase that describes the people who might live in the home."
+    ? `Please remove a phrase that describes the people who might live in the home: ${banned
+        .map((word) => `"${word}"`)
+        .join(", ")}.`
     : request;
 }
 
