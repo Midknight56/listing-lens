@@ -7,6 +7,7 @@ import { chromium } from 'playwright'
 
 // Optional: --token-file <file with WARM_TOKEN=...> sends the operator header, so test runs skip the per visitor
 // caps (the daily totals still apply). The token is never printed.
+// Optional: --lock-only skips the check for other headless browsers; use it only inside the shared browser lock.
 function operatorHeaders() {
   const at = process.argv.indexOf('--token-file')
   if (at < 0) return {}
@@ -58,7 +59,7 @@ async function clearRoom(page) {
 }
 
 async function main() {
-  const busy = otherPlaywrightRuns()
+  const busy = process.argv.includes('--lock-only') ? 0 : otherPlaywrightRuns()
   if (busy) { console.log(`HELD: ${busy} headless browser processes of another run are alive`); process.exit(3) }
   mkdirSync('out', { recursive: true })
   const browser = await chromium.launch({ headless: true })
