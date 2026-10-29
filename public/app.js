@@ -98,6 +98,7 @@ function applyPreset(preset) {
   room = [...(preset.room || [])].slice(0, 6); drawRooms(); drawLenses(); drawPresets();
   const selected = new Set(preset.features || []); featureNode.querySelectorAll('input').forEach((input) => { input.checked = selected.has(input.value); });
 }
+function showLens(lens) { currentLens = lens || null; anchors.forEach((input, i) => { input.value = lens?.anchors?.[i] || ''; }); drawLenses(); }
 function drawFeatures() {
   featureNode.replaceChildren();
   (catalogue.features?.length ? catalogue.features : FEATURES).forEach((feature) => {
@@ -229,7 +230,7 @@ async function flipLens() {
   await postRun('/api/stage', flipped, { reset: false });
   if (activeEvents.some((event) => event.t === 'done') && baselineEvents) {
     diffBox.innerHTML = renderDiff(diffBriefs(baselineEvents, activeEvents)); diffBox.hidden = false;
-    requestState = flipped; currentLens = flipped.lens; otherLens = originalRequest.lens;
+    requestState = flipped; showLens(flipped.lens); otherLens = originalRequest.lens;
     briefContent.innerHTML = renderBrief(activeEvents, otherLens.label, baselineEvents || []);
   } else requestState = originalRequest;
 }
@@ -248,7 +249,7 @@ function drawCompare() {
 }
 function showRequest(request, other) {
   selectedPreset = other?.id || null; selectedPresetData = other || null; city.value = request.city; neighbourhood.value = request.neighbourhood || '';
-  room = [...request.room]; drawRooms(); drawLenses(); drawPresets();
+  room = [...request.room]; drawRooms(); showLens(request.lens); drawPresets();
   const selected = new Set(request.features || []); featureNode.querySelectorAll('input').forEach((input) => { input.checked = selected.has(input.value); });
 }
 async function compareListing() {

@@ -16,6 +16,13 @@ const listing = (scope: string, places: number[], extra: Record<string, unknown>
 ];
 
 describe('two listings, one buyer', () => {
+  it('fills the three loves from the lens after a flip or a compare, not only the chip', () => {
+    const app = readFileSync('public/app.js', 'utf8');
+    expect(app).toMatch(/function showLens\(lens\)[^\n]*input\.value = lens\?\.anchors\?\.\[i\]/);
+    expect(app).toMatch(/async function flipLens[\s\S]*showLens\(flipped\.lens\)/);
+    expect(app).toMatch(/function showRequest[\s\S]{0,400}showLens\(request\.lens\)/);
+  });
+
   it('reads each listing: where it is, how its local favourites score, and how much of the room stays', () => {
     const fit = listingFit(listing('Wicker Park', [0.938, 0.934, 0.932, 0.923]));
     expect(fit.scope).toBe('Wicker Park');
