@@ -186,7 +186,7 @@ async function postRun(url, body, { reset = true } = {}) {
     const streamed = /ndjson/.test(response.headers.get('Content-Type') || '');
     if ((!response.ok && !streamed) || !response.body) { const info = await response.json().catch(() => ({})); throw new Error(info.error || 'The brief could not start. Try a preset.'); }
     await readNdjson(response, handleEvent);
-  } catch (error) { errorBox.textContent = error instanceof Error ? error.message : 'The brief could not start. Try a preset.'; errorBox.hidden = false; }
+  } catch (error) { errorBox.textContent = error instanceof TypeError ? 'The connection dropped. Try again, or open an example.' : error instanceof Error ? error.message : 'The brief could not start. Try a preset.'; errorBox.hidden = false; }
   finally { busy = false; form.querySelector('.primary-button').disabled = false; }
 }
 form.addEventListener('submit', (event) => {
@@ -294,7 +294,7 @@ async function loadShared(id) {
   form.hidden = true; runLog.hidden = true; document.querySelector('.tabs').hidden = true;
   try {
     const response = await fetch(`/api/brief/${encodeURIComponent(id)}`); if (!response.ok) throw new Error();
-    const saved = await response.json(); requestState = saved.request; briefId = id; activeEvents = Array.isArray(saved.events) ? saved.events : [];
+    const saved = await response.json(); requestState = saved.request; briefId = id; activeEvents = Array.isArray(saved.events) ? saved.events : []; if (typeof saved.recorded_at === 'string') activeEvents = activeEvents.map((event) => event.t === 'run' && ['live', 'cache'].includes(event.mode) ? { ...event, mode: 'replay', recorded_at: saved.recorded_at } : event);
     const run = activeEvents.find((event) => event.t === 'run'); if (run) { modeBadge.textContent = modeLabel(run); modeBadge.hidden = false; }
     briefContent.innerHTML = renderBrief(activeEvents); printButton.hidden = false; homeownerButton.hidden = false; stagerName.hidden = false;
   } catch { errorBox.textContent = 'This brief could not be found.'; errorBox.hidden = false; }

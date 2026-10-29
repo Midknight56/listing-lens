@@ -61,6 +61,11 @@ describe('house styles', () => {
     expect(parseStyle('')).toBe(null);
   });
 
+  it('uses plain language for a dropped connection and dates shared briefs', () => {
+    const app = readFileSync('public/app.js', 'utf8');
+    expect(app).toMatch(/error instanceof TypeError \? 'The connection dropped\. Try again, or open an example\.'/);
+    expect(app).toMatch(/async function loadShared[\s\S]{0,700}mode: 'replay', recorded_at: saved\.recorded_at/);
+  });
   it('the page reads a style link on load and can copy one', () => {
     const app = readFileSync('public/app.js', 'utf8');
     expect(app).toContain('parseStyle(location.search)');
