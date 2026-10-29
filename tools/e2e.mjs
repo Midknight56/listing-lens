@@ -105,6 +105,8 @@ async function main() {
     check('lens flip shows the difference', await page.locator('#lens-diff').getByText('Lens difference').count() > 0)
     const firstStage = stageBodies.at(-2), flippedStage = stageBodies.at(-1)
     check('preset flip replays the preset with its other lens', Boolean(firstStage?.preset) && flippedStage?.preset === firstStage?.preset && flippedStage?.lens?.label !== firstStage?.lens?.label)
+    const loves = () => page.locator('.anchor').evaluateAll((inputs) => inputs.map((input) => input.value).join('|'))
+    check('after the flip the form shows the new lens loves', await loves() === (flippedStage?.lens?.anchors || []).join('|'), await loves())
     const copyButton = page.locator('[data-copy-paragraph]')
     await copyButton.click()
     const copied = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '')
@@ -143,6 +145,7 @@ async function main() {
     check('the comparison names a fit for this buyer', /fits .+ better|About even|Too few local favourites/.test(verdictLine), verdictLine)
     check('the comparison shows what moves between the listings', await page.locator('#lens-diff').getByText('What moves').count() === 1 && await page.locator('.compare-table th[scope="col"]').count() === 2)
     check('the brief and the form now show the second listing', /Wicker Park/.test(await page.locator('.scope-line').innerText()) && await page.locator('#neighbourhood').inputValue() === 'Wicker Park')
+    check('after the compare the form still shows this buyer', await loves() === (second?.lens?.anchors || []).join('|') && await page.locator('#lens-chips .chip[aria-pressed="true"]').innerText() === second?.lens?.label, await loves())
     await page.screenshot({ path: 'out/e2e-two-listings.png', fullPage: true })
 
     // Bad path: Compare with no city asks for one and sends nothing.
